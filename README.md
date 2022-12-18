@@ -7,7 +7,7 @@ The motivation for this project is by real-time image processing to reach the vi
 - Dither with color palette
 - Without pre-processing
 
-[<img src="Images/Pixelism-PC-9801-Style.png" width=50% height=50% />](Images/Pixelism-PC-9801-Style.png)
+[<img src="Images/Pixelism-PC-9801-Style.png" />](Images/Pixelism-PC-9801-Style.png)
 
 Figure 1. PC-9801 style image: 4-bit indexed color from 12-bit color and CRT emulation post processing
 
