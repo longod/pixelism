@@ -1,0 +1,46 @@
+Texture2D<float4> _Expected;
+Texture2D<float4> _Actual;
+RWTexture2D<float4> _Result;
+RWStructuredBuffer<uint4> _Error;
+
+uint4 _Dimensions;
+float _Amplifier;
+
+groupshared uint3 gsSum;
+
+#pragma kernel CSMain
+[numthreads(8,8,1)]
+void CSMain (uint3 globalIdx : SV_DispatchThreadID, uint3 localIdx : SV_GroupThreadID, uint3 groupIdx : SV_GroupID)
+{
+    if(all(localIdx.xy == 0)) {
+        gsSum = 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    if(all(globalIdx.xy < _Dimensions.xy)) {
+        // ditheringされているので4x4フィルタとかした方が分かりやすいかも
+
+        // srgb -> linearに戻ってるはずなので、srgbで比較した方がいいかもしれない？感覚的にはlinearだが
+        float4 e = _Expected[globalIdx.xy]; // linear
+        float4 a = _Actual[globalIdx.xy]; // linear
+        float3 mse = e.rgb - a.rgb;
+        _Result[globalIdx.xy] = float4( abs(mse) * _Amplifier, 1); // 2乗だと見づらいので差の絶対値
+        mse *= mse;
+
+        // for sum
+        // asuintで足すと変な値にしかならないだろう、255倍してなんとか
+        // 2乗前に255倍した方が良さそう…つまり255^2倍。飽和しない？
+        // SM6.6だとかなり精度を上げられるが
+        uint3 sum = round(mse * 0xFF);
+        InterlockedAdd(gsSum.x, sum.x);
+        InterlockedAdd(gsSum.y, sum.y);
+        InterlockedAdd(gsSum.z, sum.z);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if(all(localIdx.xy == 0)) {
+        // どこかで割ってね…
+        InterlockedAdd(_Error[0].x, gsSum.x);
+        InterlockedAdd(_Error[0].y, gsSum.y);
+        InterlockedAdd(_Error[0].z, gsSum.z);
+    }
+}

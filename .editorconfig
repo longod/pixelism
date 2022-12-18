@@ -1,0 +1,44 @@
+# http://editorconfig.org/
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8-bom
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+csharp_new_line_before_open_brace = none
+csharp_new_line_before_else = false
+csharp_new_line_before_catch = false
+csharp_new_line_before_finally = false
+csharp_new_line_before_members_in_object_initializers = false
+csharp_new_line_before_members_in_anonymous_types = false
+csharp_new_line_between_query_expression_clauses = false
+
+# markdown
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+
+# VS stuff
+[*.{vcproj,bat,cmd,xaml,tt,t4,ttinclude}]
+end_of_line = crlf
+
+# VS-specific stuff
+[*.{vcxproj,vcxproj.filters,csproj,props,targets}]
+indent_style = space
+indent_size = 2
+end_of_line = crlf
+charset = utf-8-bom
+trim_trailing_whitespace = true
+insert_final_newline = false
+[*.{sln,sln.template}]
+indent_style = tab
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = false

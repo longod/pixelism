@@ -1,0 +1,402 @@
+﻿#pragma multi_compile_local _ COLOR_12BIT
+#pragma multi_compile_local _ PRODUCT_VOLUME
+
+#include "UnityCG.cginc"
+#include "Histogram.cginc"
+#include "IndirectArguments.cginc"
+
+struct ColorVolume {
+    float priority;
+    uint3 min;
+    uint count;
+    uint3 max;
+};
+
+struct Scratch {
+    uint volumeCount; // == palette count
+    int index; // cutting index
+    uint3 swizzle;
+    float normalizer;
+};
+
+ColorVolume CreateVolume(in uint3 min, in uint3 max) {
+    ColorVolume v;
+    v.min = min;
+    v.max = max;
+    v.count = 0; // later
+    v.priority = 0; // later
+    return v;
+}
+
+ColorVolume CreateVolume(in uint3 min, in uint3 max, uint count) {
+    ColorVolume v;
+    v.min = min;
+    v.max = max;
+    v.count = count;
+    v.priority = count;
+    return v;
+}
+
+
+uint ComputeAxis(in ColorVolume v) {
+    uint3 edge = (v.max - v.min) + 1; // 比較なので +1 無くても成立するが、min<=maxであり、Volumeと一応整合性を保つ
+    uint axis;
+    // 同値の場合 G>R>B で優先
+    if (edge.y >= edge.z) {
+        if (edge.y >= edge.x) {
+            axis = 1; // g
+        } else {
+            axis = 0; // r
+        }
+
+    } else {
+        if (edge.x >= edge.z) {
+            axis = 0; // r
+        } else {
+            axis = 2; // b
+        }
+    }
+
+    return axis;
+}
+
+uint ComputeVolume(in ColorVolume v){
+    uint3 len = (v.max - v.min) + 1; // min<=max、+1 乗算して0になって欲しくないので
+    return len.x * len.y * len.z;
+}
+
+//CBUFFER_START(PerImage)
+//int _VolumeCount;
+//CBUFFER_END
+
+uint _VolumeCount;
+uint _PixelCount; // for full space
+
+
+RWStructuredBuffer<ColorVolume> _Volumes;
+RWStructuredBuffer<Scratch> _Scratch;
+RWStructuredBuffer<uint> _Histogram;
+RWStructuredBuffer<uint3> _MinMax;
+RWStructuredBuffer<uint> _SumPerAxis; // histogram per axis11
+RWStructuredBuffer<float3> _Colors;
+RWStructuredBuffer<DispatchArguments> _Args;
+
+#pragma kernel SetupVolume
+[numthreads(1, 1, 1)]
+void SetupVolume(uint id : SV_DispatchThreadID) {
+    // full space
+    // todo fit min max
+    // todo countも欲しい。殆ど場合無くても成立するが
+    //_Volumes[0] = CreateVolume(uint3(0, 0, 0), uint3(ChannelMax, ChannelMax, ChannelMax), _PixelCount);
+    // keyword増やしたくないので常にバッファを使う
+    _Volumes[0] = CreateVolume(_MinMax[0], _MinMax[1], _PixelCount);
+
+    Scratch scratch;
+    scratch.volumeCount = 1;
+    scratch.index = 0;
+    scratch.swizzle = uint3(0, 1, 2);
+    scratch.normalizer = 1.0f;
+    _Scratch[0] = scratch;
+
+}
+
+#pragma kernel FindCuttingVolume
+[numthreads(1, 1, 1)]
+void FindCuttingVolume(uint id : SV_DispatchThreadID) {
+    const uint count = _Scratch[0].volumeCount;
+    if(count >= _VolumeCount) {
+        _Args[0] = (DispatchArguments)0;
+        return;
+    }
+
+    int index = 0;
+    float prio = _Volumes[0].priority;
+    for (uint i = 1; i < count; ++i) {
+        float p = _Volumes[i].priority;
+        if (p > prio) {
+            index = (int)i;
+            prio = p;
+        }
+    }
+
+    // float だと初期値負数の方がいいかも
+    if(prio == 0) {
+        index = -1; // invalid
+    }
+    if(index < 0) {
+        // mark as end
+        _Args[0] = (DispatchArguments)0;
+        return;
+    }
+
+    _Scratch[0].index = index;
+    uint axis = ComputeAxis(_Volumes[index]);
+    _Scratch[0].swizzle = uint3(axis, (axis + 1) % 3, (axis + 2) % 3);
+
+    DispatchArguments args = (DispatchArguments)0;
+    args.threadGroupCount.xyz = 1;
+    _Args[0] = args;
+}
+
+groupshared uint gsSumPerAxis[ChannelSize];
+
+#pragma kernel BuildAxisHistogram
+[numthreads(ChannelSize, ChannelSize, 1)] // 32x32=1024
+void BuildAxisHistogram(uint2 id : SV_DispatchThreadID, uint2 groupThreadId : SV_GroupThreadID) {
+
+    uint2 ij = groupThreadId.xy;
+    if(ij.y == 0) {
+        gsSumPerAxis[ij.x] = 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    //const uint localThreadId = groupThreadId.x + groupThreadId.y * ChannelSize;
+    Scratch scratch = _Scratch[0];
+    uint3 swizzle = scratch.swizzle; // 間接的なアクセスで遅くなるかも
+    ColorVolume vol = _Volumes[scratch.index];
+
+    if(ij.x >= vol.min[swizzle.x] && ij.x <= vol.max[swizzle.x] &&
+    ij.y >= vol.min[swizzle.y] && ij.y <= vol.max[swizzle.y]) {
+        uint sum = 0;
+        for (uint k = vol.min[swizzle.z]; k <= vol.max[swizzle.z]; ++k) {
+            uint bin = ToIndex(ij.x, ij.y, k, swizzle);
+            uint count = _Histogram[bin];
+            sum += count;
+        }
+        InterlockedAdd(gsSumPerAxis[ij.x], sum);
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    const uint localThreadId = groupThreadId.x + groupThreadId.y * ChannelSize;
+    if(localThreadId == 0) {
+        // 1,1,1でしか起動しない
+        uint i;
+        for (i = vol.min[swizzle.x] + 1; i <= vol.max[swizzle.x]; ++i) {
+            gsSumPerAxis[i] += gsSumPerAxis[i - 1];
+        }
+        for(i = 0; i < ChannelSize; ++i) {
+            _SumPerAxis[i] = gsSumPerAxis[i];
+        }
+        // ここでcutいけるけれど、機能テスト的に先ず分離しておきたい
+        // ここでcutする場合は、_SumPerAxis不要になりそう
+    }
+}
+
+#pragma kernel CutVolume
+[numthreads(1, 1, 1)]
+void CutVolume(uint id : SV_DispatchThreadID) {
+    Scratch scratch = _Scratch[0];
+    uint3 swizzle = scratch.swizzle;
+    ColorVolume vol = _Volumes[scratch.index];
+    uint total = _SumPerAxis[vol.max[swizzle.x]];
+    uint median = total / 2;
+
+    for (uint i = vol.min[swizzle.x]; i <= vol.max[swizzle.x]; ++i) {
+        if (_SumPerAxis[(int)i] > median) { // 分割すべき中央値を探す 昇順なのでbinary searchいけるけれど、要素数は多くないから大差無いかな
+            uint left = i - vol.min[swizzle.x];
+            uint right = vol.max[swizzle.x] - i;
+
+            // modified では大きい方を入れ替えることで偏りを減らす
+            // array reference cannot be used as an l-value; not natively addressable
+
+            uint3 vmax = vol.max;
+            uint3 vmin = vol.min;
+            uint v = 0;
+            if (left > right) {
+                //vmax[swizzle.x] = max(vol.min[swizzle.x], (i - 1) - left / 2);
+                v = max(vol.min[swizzle.x], (i - 1) - left / 2);
+            } else {
+                //vmax[swizzle.x] = min(vol.max[swizzle.x] - 1, i + right / 2);
+                v= min(vol.max[swizzle.x] - 1, i + right / 2);
+            }
+            switch (swizzle.x) {
+                case 0:
+                    vmax.x = v;
+                    vmin.x = vmax.x + 1;
+                    break;
+                case 1:
+                    vmax.y = v;
+                    vmin.y = vmax.y + 1;
+                    break;
+                case 2:
+                    vmax.z = v;
+                    vmin.z = vmax.z + 1;
+                    break;
+            }
+
+            ColorVolume vbox1 = CreateVolume(vol.min, vmax);
+            //vmin[swizzle.x] = vbox1.max[swizzle.x] + 1;
+            ColorVolume vbox2 = CreateVolume(vmin, vol.max);
+
+            // store
+            _Volumes[scratch.index] = vbox1;
+            _Volumes[scratch.volumeCount] = vbox2;
+            return;
+        }
+    }
+
+    // fallback?
+}
+
+groupshared uint gsSum[2];
+groupshared uint gsIndex1;
+groupshared uint gsIndex2;
+
+#pragma kernel CountVolume
+[numthreads(ChannelSize, ChannelSize, 1)]
+void CountVolume(uint id : SV_DispatchThreadID, uint2 groupThreadId : SV_GroupThreadID) {
+    const uint localThreadId = groupThreadId.x + groupThreadId.y * ChannelSize;
+    if(localThreadId == 0) {
+        Scratch scratch = _Scratch[0]; // これRWだから触るのlocal 0のみにしたいな sync挟んでいるとはいえ
+        gsSum[0] = 0;
+        gsSum[1] = 0;
+        gsIndex1 = scratch.index;
+        gsIndex2 = scratch.volumeCount;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    ColorVolume vol1 = _Volumes[gsIndex1];
+    ColorVolume vol2 = _Volumes[gsIndex2];
+
+    // TODO もう1個やる
+
+    uint2 ij = groupThreadId.xy;
+    if(all(ij >= vol1.min.xy) && all(ij <= vol1.max.xy)) {
+        for (uint k = vol1.min.z; k <= vol1.max.z; ++k) {
+            uint bin = ToIndex(ij.x, ij.y, k);
+            uint count = _Histogram[bin];
+            InterlockedAdd(gsSum[0], count);
+        }
+    }
+    if(all(ij >= vol2.min.xy) && all(ij <= vol2.max.xy)) {
+        for (uint k = vol2.min.z; k <= vol2.max.z; ++k) {
+            uint bin = ToIndex(ij.x, ij.y, k);
+            uint count = _Histogram[bin];
+            InterlockedAdd(gsSum[1], count);
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    if(localThreadId == 0) {
+        const float normalizer = _Scratch[0].normalizer;
+
+        vol1.count = gsSum[0];
+        uint v1 = ComputeVolume(vol1);
+        if(v1 > 1) {
+#if PRODUCT_VOLUME
+            vol1.priority = vol1.count * (v1 * normalizer);
+#else
+            vol1.priority = vol1.count;
+#endif
+        }
+
+        vol2.count = gsSum[1];
+        uint v2 = ComputeVolume(vol2);
+        if(v2 > 1) {
+#if PRODUCT_VOLUME
+            vol2.priority = vol2.count * (v2 * normalizer);
+#else
+            vol2.priority = vol2.count;
+#endif
+        }
+
+        _Volumes[gsIndex1] = vol1;
+        _Volumes[gsIndex2] = vol2;
+        // if zero count...
+        if(vol2.count == 0) {
+
+        } else if (vol1.count == 0) {
+            _Volumes[gsIndex1] = vol2;
+        } else {
+            _Scratch[0].volumeCount = gsIndex2 + 1;
+        }
+
+
+    }
+}
+
+groupshared uint gsMax;
+
+#pragma kernel UpdatePriority
+// palette数が十分に収まる数, そうでない場合、maxの集計がもうひと手間かかる
+//[numthreads(256, 1, 1)]
+[numthreads(16, 1, 1)]
+void UpdatePriority(uint id : SV_DispatchThreadID) {
+    // todo 一応 priorityを選べるとよい
+    if(id == 0){
+        gsMax = 0;
+    }
+    GroupMemoryBarrierWithGroupSync();
+    const Scratch scratch = _Scratch[0];
+    if(id < scratch.volumeCount) {
+        ColorVolume vol = _Volumes[id];
+        uint v = ComputeVolume(vol);
+        InterlockedMax(gsMax, v);
+    }
+    GroupMemoryBarrierWithGroupSync();
+    float norm = 1.0f;
+    if(gsMax> 0) { // 3項演算子だと、最適化でfalseでも実行される可能性がある
+        norm = 1.0f / (float)gsMax;
+    }
+    if(id < scratch.volumeCount) {
+        ColorVolume vol = _Volumes[id];
+        uint v = ComputeVolume(vol); // todo cache
+        _Volumes[id].priority = vol.count * (v * norm);
+    }
+    if(id == 0){
+        _Scratch[0].normalizer = norm;
+    }
+}
+
+groupshared uint gsVolumeCount;
+groupshared uint4 gsSumColor;
+
+#pragma kernel ComputeColor
+[numthreads(ChannelSize, ChannelSize, 1)]
+void ComputeColor(uint id : SV_DispatchThreadID, uint2 groupThreadId : SV_GroupThreadID) {
+    const uint localThreadId = groupThreadId.x + groupThreadId.y * ChannelSize;
+    if(localThreadId == 0) {
+        const Scratch scratch = _Scratch[0];
+        const uint volumeCount = scratch.volumeCount;
+        gsVolumeCount = volumeCount;
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    // 全部まとめて求めたい
+    for(uint v = 0; v < gsVolumeCount; ++v) {
+
+        const ColorVolume vol = _Volumes[v];
+
+        if(localThreadId == 0) {
+            gsSumColor = 0;
+        }
+        GroupMemoryBarrierWithGroupSync();
+
+        uint2 ij = groupThreadId.xy;
+        if(all(ij >= vol.min.xy) && all(ij <= vol.max.xy)) {
+            for (uint k = vol.min.z; k <= vol.max.z; ++k) {
+                uint bin = ToIndex(ij.x, ij.y, k);
+                uint count = _Histogram[bin];
+                if(count > 0) {
+                    uint3 c = Inverse(ij.x, ij.y, k, count);
+                    InterlockedAdd(gsSumColor.x, c.x);
+                    InterlockedAdd(gsSumColor.y, c.y);
+                    InterlockedAdd(gsSumColor.z, c.z);
+                    InterlockedAdd(gsSumColor.w, count);
+                }
+            }
+        }
+        GroupMemoryBarrierWithGroupSync();
+
+        if(localThreadId == 0) {
+            if(gsSumColor.w > 0) {
+                float3 color = saturate(ToColor(gsSumColor.xyz,  gsSumColor.w) / 255.0f);
+                _Colors[v] = color;
+            } else {
+                uint3 n = (vol.max + vol.min + 1) / 2;
+                float3 color = saturate(ToColor(Inverse(n.x, n.y, n.z, 1), 1) / 255.0f);
+                _Colors[v] = color;
+            }
+        }
+    }
+}

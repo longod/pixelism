@@ -1,0 +1,20 @@
+﻿#include "UnityCG.cginc"
+#include "IndirectArguments.cginc"
+
+//
+StructuredBuffer<int> _PaletteCount;
+//int _PaletteMax;
+RWStructuredBuffer<DrawArguments> _Args;
+
+#pragma kernel Main
+[numthreads(1, 1, 1)]
+void Main(uint3 dtID : SV_DispatchThreadID) {
+    DrawArguments args = (DrawArguments)0;
+    uint count = _PaletteCount[0];
+    args.vertexCountPerInstance = 6; // quad vertex
+    args.instanceCount = count;
+    args.startVertexLocation = 0;
+    args.startInstanceLocation = 0;
+    _Args[0] = args;
+}
+

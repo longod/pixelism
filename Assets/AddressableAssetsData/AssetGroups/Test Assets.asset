@@ -1,0 +1,280 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Test Assets
+  m_EditorClassIdentifier: 
+  m_GroupName: Test Assets
+  m_Data:
+    m_SerializedData: []
+  m_GUID: b945d24a178f48148bc2e2f6c431c386
+  m_SerializeEntries:
+  - m_GUID: c4111329f76c00240bbf0d70f970052c
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_wood_game
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f973d4680f1b6994ca55c9b7037951da
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_tools_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f50b440c4d5d0a14dbac54ef17eea82f
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_tools_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7c643965f24c47a47b621b2862a29a44
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_tomatoes_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f82724b00374abc47aa17608847f2c13
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_tomatoes_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b91b543911b7a1c4bab5b44f3c0a54a6
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_sweets
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4602a49d523c61d4d81ed259808126ca
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_socks
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9f377fbff9aabc342b035b2ac590d4d0
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_snails
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0722dc7950fe29644aff238461dc122d
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_screws
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 49bb56d0fbd901b4a8da739090926620
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_scarf
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bf711e568f95b0b4a8c2663d3f3c1ad0
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_roof
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 37a5c6cb2e369464aa449521fc8029e2
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_plastic
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d01d664c64468bf4aa2400d9b1c77fe3
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_pillar
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6be57d219223d234699f76167b5b7678
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_pencils_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 38c7de9c5279cdd459a8438bbc5a3939
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_pencils_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 288c8e0a92d8a764f8e35c11e13058bf
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_multimeter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76d9894fda806b24086af64fbd1bce4a
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_lion
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f0ce00c1dbc0a684884f2cce62bf55d8
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_keyboard_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 295fbe4654a21db4d903c609a350fed0
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_keyboard_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 876e763c311a0de449d3d551df6f8e7f
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_guitar_head
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 33c7543330af50044a5e0a711ffc8a80
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_guitar_fret
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 80bb38b1c23a7864bac6905b7f463896
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_guitar_bridge
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ebd6276f6d1ee0045b31c38fa5164b85
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_garden_table
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 868de0fa6685aee468582e68d8167a66
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_flowers
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6fa603155b6d12d40a4688c412b6e58f
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_fence
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 95ff43d873bcc2a4e8773d6d9548ce2e
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_ducks
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e2c295415c68e55429f6b0221f3c09ad
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_cushions
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 07f3c2f17435c6241ae30395a0622b47
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_coins
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a90cac1c0c20a404fbf213a3754b3418
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_clips
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 52d6b49163e13fc4bbf7ffca59794c28
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_chairs
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eaeaa19fe49f1c94c9714dc5ae05a310
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_carrots
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: baa2ae1cb510d0b45b84947946a8e758
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_cards_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8de0a9a69ae57d2409bf48eaa2178259
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_cards_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0e1f0df9413869f4aa51c6cf8e05c418
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_building
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 786df6c1fc71b2e4bb117987cb844372
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_billiard_balls_b
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d24a8b593189b864ba2af71ebcff840b
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_billiard_balls_a
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 90aa3df0bd1ecc3469ab80529c5011d2
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_bananas
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 51bd871c199093d4f905fd5929b57aa3
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_baloons
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 19a0d4a2287f6cc4b8fad94c4b391e2c
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_apples
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 38686ed217cb62b429ce430713c03862
+    m_Address: img_2448x2448_3x8bit_SRC_RGB_almonds
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d2ab5e2592d202439fa0d79d488b66b
+    m_Address: img_640x400_3x8bit_RGB_gray_level_crossing
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ecc1c5cd831b1394c98cc28bf69950be
+    m_Address: img_640x400_3x8bit_RGB_gray_level_bits
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8d5df51a06d3b294e8e97dd7a247f7af
+    m_Address: img_640x400_3x8bit_RGB_gray_level_all
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d98b01ef1e4b2254cbd65a25155258c8
+    m_Address: img_640x400_3x8bit_RGB_color_SMPTE_RP_219_2002
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1f681bb83c0c5a94eb72f9dcbe860177
+    m_Address: img_640x400_3x8bit_RGB_color_rainbow_gradient
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c6cb1803a6e73e94e970441053573a7b
+    m_Address: img_640x400_3x8bit_RGB_color_rainbow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 854b5d217f712964e8a1f77d3916aeb1
+    m_Address: img_640x400_3x8bit_RGB_color_bars_CMYKWRGB_gradient
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0ca4609872a2d93498da838ce3f1ed4a
+    m_Address: img_640x400_3x8bit_RGB_color_bars_CMYKWRGB_100IRE
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 276d418965027a04493f060bcdf08906
+    m_Address: img_640x400_3x8bit_RGB_color_bars_CMYKWRGB_75IRE
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aaf85d34d5555ae42ad236192881132a
+    m_Address: img_640x400_3x8bit_RGB_color_bars_CMYKWRGB
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8a2459d4d6145d74b8dcce41cfeacc57
+    m_Address: ShaderMathTest
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 7c45fce96f9c2454fbe9f5628e545d3b, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: d998a25154140dd43b7f04f732cb8c54, type: 2}
+    - {fileID: 11400000, guid: 12a6f5a39710b294891214b99a5c4039, type: 2}

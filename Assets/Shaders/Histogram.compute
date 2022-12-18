@@ -1,0 +1,99 @@
+﻿#include "UnityCG.cginc"
+#include "ColorSpace.cginc"
+#include "Histogram.cginc"
+
+#pragma multi_compile_local _ MINMAX_RANGE
+
+// 12-bit, groupshared的に15-bitは非常に厳しいが、12-bitくらいは分解能を持ちたい
+// 4096*4-byte=16kb
+static const uint GroupThreadX = 16;
+static const uint GroupThreadY = 16;
+static const uint GroupThreadXY = GroupThreadX * GroupThreadY;
+static const uint PER_THREAD_BIN = HistogramSize / GroupThreadXY; // 割り切れること
+
+CBUFFER_START(PerImage)
+uint4 _Dimensions;
+CBUFFER_END
+
+Texture2D<float4> _Source;
+RWStructuredBuffer<uint> _Histogram;
+RWStructuredBuffer<uint3> _MinMax;
+
+groupshared uint gsHistogram[HistogramSize];
+groupshared uint3 gsMin;
+groupshared uint3 gsMax;
+
+#pragma kernel Build
+[numthreads(GroupThreadX, GroupThreadY, 1)]
+void Build(uint2 id : SV_DispatchThreadID, uint2 groupThreadId : SV_GroupThreadID) {
+    const uint localThreadId = groupThreadId.x + groupThreadId.y * GroupThreadX;
+    const uint offset = localThreadId * PER_THREAD_BIN;
+    uint i;
+    for(i = 0; i < PER_THREAD_BIN; ++i) {
+        gsHistogram[offset+ i] = 0u;
+    }
+#if MINMAX_RANGE
+    if(localThreadId == 0) {
+        gsMin = 0xFFFFFFFF;
+        gsMax = 0;
+    }
+#endif // MINMAX_RANGE
+    GroupMemoryBarrierWithGroupSync();
+
+    if(id.x < _Dimensions.x && id.y < _Dimensions.y) {
+        float3 color = _Source[id].rgb; // ignore alpha
+        color = LinearToGamma(color);
+        //uint bin = ToIndex(color);
+
+        uint3 c = uint3(saturate(color) * 255.f);
+        uint3 q = Quantize(c);
+        uint bin = ToIndex(q.x, q.y, q.z);
+
+        InterlockedAdd(gsHistogram[bin], 1u);
+
+#if MINMAX_RANGE
+        // ついでに成分別のmin, maxを求めておきたい
+        InterlockedMin(gsMin.x, q.x);
+        InterlockedMin(gsMin.y, q.y);
+        InterlockedMin(gsMin.z, q.z);
+        InterlockedMax(gsMax.x, q.x);
+        InterlockedMax(gsMax.y, q.y);
+        InterlockedMax(gsMax.z, q.z);
+#endif // MINMAX_RANGE
+    }
+    GroupMemoryBarrierWithGroupSync();
+
+    for(i = 0; i < PER_THREAD_BIN; ++i) {
+        uint j = offset + i;
+        InterlockedAdd(_Histogram[j], gsHistogram[j]);
+    }
+
+#if MINMAX_RANGE
+    if(localThreadId == 0) {
+        InterlockedMin(_MinMax[0].x, gsMin.x);
+        InterlockedMin(_MinMax[0].y, gsMin.y);
+        InterlockedMin(_MinMax[0].z, gsMin.z);
+        InterlockedMax(_MinMax[1].x, gsMax.x);
+        InterlockedMax(_MinMax[1].y, gsMax.y);
+        InterlockedMax(_MinMax[1].z, gsMax.z);
+    }
+#endif // MINMAX_RANGE
+}
+
+#pragma kernel Clear
+[numthreads(64, 1, 1)]
+void Clear(uint id : SV_DispatchThreadID) {
+    if(id < HistogramSize) {
+        _Histogram[id] = 0u;
+    }
+    if(id == 0) {
+#if MINMAX_RANGE
+        _MinMax[0] = 0xFFFFFFFFu; // min
+        _MinMax[1] = 0x0u; // max
+#else
+        // full space
+        _MinMax[0] = uint3(0, 0, 0); // min
+        _MinMax[1] = uint3(ChannelMax, ChannelMax, ChannelMax); // max
+#endif // MINMAX_RANGE
+    }
+}

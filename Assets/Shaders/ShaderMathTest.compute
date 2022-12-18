@@ -1,0 +1,29 @@
+
+#include "UnityCG.cginc"
+#include "Math.cginc"
+
+uint4 _Input;
+RWStructuredBuffer<uint4> _Result;
+
+#pragma kernel DivRoundUpTest
+[numthreads(1,1,1)]
+void DivRoundUpTest(uint3 id : SV_DispatchThreadID)
+{
+    _Result[0].x = DivRoundUp(_Input.x, _Input.y);
+    _Result[0].yzw = DivRoundUp((uint3)_Input.x, (uint3)_Input.y);
+}
+
+#pragma kernel NextPowerOfTwoTest
+[numthreads(1,1,1)]
+void NextPowerOfTwoTest(uint3 id : SV_DispatchThreadID)
+{
+    _Result[0].x = NextPowerOfTwo(_Input.x);
+}
+
+#pragma kernel Quantize4BitsTest
+[numthreads(1,1,1)]
+void Quantize4BitsTest(uint3 id : SV_DispatchThreadID)
+{
+    uint v = _Input.x;
+    _Result[0].x = Quantize4Bits(_Input.x);
+}
