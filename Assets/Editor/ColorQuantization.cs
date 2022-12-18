@@ -134,15 +134,16 @@ namespace Pixelism {
 
                 using (new GUILayout.VerticalScope("box")) {
                     using (new EditorGUILayout.HorizontalScope()) {
-                        string[] showImageItems = { "Reduction", "Error", "Original" };
+                        string[] showImageItems = { "Quantized", "Difference", "Source" };
                         showImage = GUILayout.Toolbar(showImage, showImageItems);
 
                         GUILayout.FlexibleSpace();
 
-                        using (new EditorGUI.DisabledScope(showImage >= 2 || GetTexture(showImage, source) == null)) {
+                        using (new EditorGUI.DisabledScope(GetTexture(showImage, source) == null)) {
                             if (GUILayout.Button("Save")) {
-                                string path = EditorUtility.SaveFilePanel("Save texture as PNG", "", source.name + (showImage == 0 ? ".reduction" : ".error") + ".png", "png");
+                                string path = EditorUtility.SaveFilePanel("Save texture as PNG", "", source.name + (showImage == 0 ? ".reduction" : ".error") + ".png", "png"); // fixme suffix
                                 if (!string.IsNullOrEmpty(path)) {
+                                    // todo differenceはsRGBに変換しないといけない
                                     Texture2D dest = GetTexture(showImage, source);
                                     if (dest != null) {
                                         var bin = dest.EncodeToPNG();

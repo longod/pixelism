@@ -51,7 +51,7 @@
                 float2 size = float2(sizex, sizex * aspect);
                 float offsetx = 0 / _ScreenParams.x * 2.0f;
                 float2 offset = float2(offsetx, offsetx * aspect);
-                uint row = 16;
+                uint row = 4;
                 pos.xy = xy[q];
                 pos.xy *= size;
                 pos.xy += float2(-1, 1); // top left
