@@ -76,7 +76,7 @@ Since the current focus is on color palette generation, the dithering and color 
 
 The background may be too dominant and color palette may not be generated in focused foreground objects. A possible countermeasure to this is to mask focused objects with a depth or stencil on color palette generation.
 
-Many dispatches are causing some overhead. This could be minimized if [ID3D12GraphicsCommandList::ExecuteIndirect](https://learn.microsoft.com/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-executeindirect) could be used, but cannot be used in unity.
+Many dispatches are causing some overhead. This could be minimized if [ID3D12GraphicsCommandList::ExecuteIndirect](https://learn.microsoft.com/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-executeindirect) could be used, but cannot be used in Unity.
 
 [<img src="Images/Pixelism-Temporal-LackOfRobustness.gif" />](Images/Pixelism-Temporal-LackOfRobustness.gif)
 

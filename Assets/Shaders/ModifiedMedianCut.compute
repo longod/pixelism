@@ -140,9 +140,9 @@ void FindCuttingVolume(uint id : SV_DispatchThreadID) {
 
 groupshared uint gsSumPerAxis[ChannelSize];
 
-#pragma kernel BuildAxisHistogram
+#pragma kernel BuildAxis
 [numthreads(ChannelSize, ChannelSize, 1)] // 32x32=1024
-void BuildAxisHistogram(uint2 id : SV_DispatchThreadID, uint2 groupThreadId : SV_GroupThreadID) {
+void BuildAxis(uint2 id : SV_DispatchThreadID, uint2 groupThreadId : SV_GroupThreadID) {
 
     uint2 ij = groupThreadId.xy;
     if(ij.y == 0) {

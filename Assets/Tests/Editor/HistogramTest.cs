@@ -34,32 +34,21 @@ namespace Pixelism.Test {
             }
         }
 
-        public struct CacheHistogram : IDisposable {
-            private JobHandle handle;
-            private NativeArray<uint> data;
-            private NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU> volume;
-            private uint[] managed;
+        public readonly struct CacheHistogram : IDisposable {
+            private readonly JobHandle handle;
+            private readonly NativeArray<uint> data;
+            private readonly NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU> volume;
 
             public CacheHistogram(JobHandle handle, NativeArray<uint> data, NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU> volume) {
                 this.handle = handle;
                 this.data = data;
                 this.volume = volume;
-                this.managed = null;
             }
 
             public NativeArray<uint> Histogram {
                 get {
                     handle.Complete(); // 何度も呼ぶとオーバーヘッドなんだけれど
                     return data;
-                }
-            }
-
-            public uint[] ManagedHistogram {
-                get {
-                    if (managed == null) {
-                        managed = Histogram.ToArray();
-                    }
-                    return managed;
                 }
             }
 
@@ -81,7 +70,6 @@ namespace Pixelism.Test {
                 handle.Complete();
                 data.Dispose();
                 volume.Dispose();
-                managed = null;
             }
 
             public static CacheHistogram Create<T>(Texture2D res, T converter) where T : ModifiedMedianCutCPU.IIndexConverter {
@@ -188,7 +176,7 @@ namespace Pixelism.Test {
                         // 隣接する前後を足し合わせて n%以内とか？
                         // 厳密なら、誤差でbinningが分かれそうな境界付近の値を調べる
                         // シンプルな誤差の出にくいデータセットを用意する
-                        AssertHelper.AreEqual<uint>(expected.ManagedHistogram, actual);
+                        AssertHelper.AreEqual<uint>(expected.Histogram, actual);
                     }
                     {
                         uint3[] actual = new uint3[minmaxBuffer.count];

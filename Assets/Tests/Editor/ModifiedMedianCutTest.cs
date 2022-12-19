@@ -74,7 +74,7 @@ namespace Pixelism.Test {
         [Test]
         public void SetupVolume([Values(true, false)] bool fullRange) {
             using (var volumeBuffer = new ComputeBuffer(1, Marshal.SizeOf<ColorVolume>())) {
-                using (var scratchBuffer = new ComputeBuffer(1, Marshal.SizeOf<Scratch>())) {
+                using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
                     using (var minmaxBuffer = Histogram.CreateMinMaxBuffer()) {
                         minmaxBuffer.SetData(new uint3[] { new uint3(0, 0, 0), new uint3(0xf, 0xf, 0xf) });
 
@@ -119,7 +119,7 @@ namespace Pixelism.Test {
 
             using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
                 volumesBuffer.SetData(volumes);
-                using (var scratchBuffer = new ComputeBuffer(1, Marshal.SizeOf<Scratch>())) {
+                using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
                     scratchBuffer.SetData(scratch);
 
                     medianCut.FindCuttingVolume(command, volumesBuffer, scratchBuffer, indirectBuffer, volumesBuffer.count);
@@ -142,7 +142,7 @@ namespace Pixelism.Test {
         }
 
         [TestCaseSource(nameof(TestImage))]
-        public void BuildAxisHistogram(string key) {
+        public void BuildAxis(string key) {
             var image = cachedImage[key];
             var histo = cachedHistogram[key];
 
@@ -154,12 +154,12 @@ namespace Pixelism.Test {
                     var volumes = new ColorVolume[1] { new ColorVolume() { count = 0, max = new uint3(0xf, 0xf, 0xf), min = new uint3(0, 0, 0), priority = 0 } };
                     volumesBuffer.SetData(volumes);
 
-                    using (var scratch = new ComputeBuffer(1, Marshal.SizeOf<Scratch>())) {
-                        scratch.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = new uint3(0, 1, 2) } });
+                    using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                        scratchBuffer.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = new uint3(0, 1, 2) } });
 
-                        using (var sumPerAxisBuffer = new ComputeBuffer(16, Marshal.SizeOf<uint>())) {
+                        using (var sumPerAxisBuffer = ModifiedMedianCut.CreateAxisBuffer()) {
 
-                            medianCut.BuildAxisHistogram(command, volumesBuffer, scratch, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
+                            medianCut.BuildAxis(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
 
                             Graphics.ExecuteCommandBuffer(command);
 
@@ -170,8 +170,8 @@ namespace Pixelism.Test {
                                 using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max)).ToArray(), Allocator.TempJob)) {
 
                                     var conv = converters[0];
-                                    var build = new BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, conv).Schedule();
-                                    var sumup = new SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vol.Slice(0, 1), sumPerAxis, conv).Schedule(build);
+                                    var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, conv).Schedule();
+                                    var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vol.Slice(0, 1), sumPerAxis, conv).Schedule(build);
                                     sumup.Complete();
                                     AssertHelper.AreEqual<uint>(sumPerAxis.ToArray(), actual);
                                 }
@@ -202,13 +202,13 @@ namespace Pixelism.Test {
                 using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
                     volumesBuffer.SetData(volumes);
 
-                    using (var scratch = new ComputeBuffer(1, Marshal.SizeOf<Scratch>())) {
-                        scratch.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = (uint3)conv.Swizzle } });
+                    using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                        scratchBuffer.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = (uint3)conv.Swizzle } });
 
-                        using (var sumPerAxisBuffer = new ComputeBuffer(16, Marshal.SizeOf<uint>())) {
+                        using (var sumPerAxisBuffer = ModifiedMedianCut.CreateAxisBuffer()) {
 
-                            medianCut.BuildAxisHistogram(command, volumesBuffer, scratch, histogramBuffer, sumPerAxisBuffer, indirectBuffer); // TODO これはcpu referenceを使う
-                            medianCut.CutVolume(command, volumesBuffer, scratch, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
+                            medianCut.BuildAxis(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer); // TODO これはcpu referenceを使う
+                            medianCut.CutVolume(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
 
                             Graphics.ExecuteCommandBuffer(command);
 
@@ -224,9 +224,9 @@ namespace Pixelism.Test {
                                     //var axis = vbox1[0].ComputeAxis(); // 軸の決定
                                     //var conv = converters[axis];
 
-                                    var build = new BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, conv).Schedule();
-                                    var sumup = new SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vbox1, sumPerAxis, conv).Schedule(build);
-                                    var cut = new CutVolumeJob<DefaultConverter>(vbox1, vbox2, sumPerAxis, conv).Schedule(sumup);
+                                    var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, conv).Schedule();
+                                    var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vbox1, sumPerAxis, conv).Schedule(build);
+                                    var cut = new ModifiedMedianCutCPU.CutVolumeJob<ModifiedMedianCutCPU.DefaultConverter>(vbox1, vbox2, sumPerAxis, conv).Schedule(sumup);
                                     cut.Complete();
 
                                     Assert.AreEqual(vbox1[0].min, actual[0].min);
@@ -259,7 +259,7 @@ namespace Pixelism.Test {
 
                 using (var volumeBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
                     volumeBuffer.SetData(volumes);
-                    using (var scratchBuffer = new ComputeBuffer(1, Marshal.SizeOf<Scratch>())) {
+                    using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
                         scratchBuffer.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = new uint3(0, 1, 2) } });
 
                         medianCut.CountVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, indirectBuffer, false);

@@ -185,9 +185,9 @@ namespace Pixelism {
                 burstCount = 0;
                 prefixCurrentBurst = string.Concat(prefixBurst, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss.fff_"));
                 Time.captureFramerate = captureFramerate;
-                Debug.Log("Start to capture screenshot bursting...");
+                Debug.Log("Start to burst screenshot...");
             } else {
-                Debug.Log("End to capture screenshot bursting...");
+                Debug.Log("End to burst screenshot.");
                 Time.captureFramerate = 0; // reset
             }
         }

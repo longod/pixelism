@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using Unity.Mathematics;
 
 namespace Pixelism.Test {
@@ -39,7 +40,92 @@ namespace Pixelism.Test {
             }
         }
 
+        public static void AreEqual<T>(NativeSlice<T> expected, ReadOnlySpan<T> actual) where T : struct, IEquatable<T> {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, T, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!actual[i].Equals(expected[i])) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
+            }
+        }
+
+        public static void AreEqual<T>(ReadOnlySpan<T> expected, NativeSlice<T> actual) where T : struct, IEquatable<T> {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, T, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!actual[i].Equals(expected[i])) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
+            }
+        }
+
+        // NativeArray -> ReadOnlySpanに対応してくれ
+        public static void AreEqual<T>(NativeSlice<T> expected, NativeSlice<T> actual) where T : struct, IEquatable<T> {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, T, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!actual[i].Equals(expected[i])) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
+            }
+        }
+
         public static void AreEqual<T>(ReadOnlySpan<T> expected, ReadOnlySpan<T> actual, IEqualityComparer<T> eq) where T : IEquatable<T> {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, T, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!eq.Equals(actual[i], expected[i])) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
+            }
+        }
+
+        public static void AreEqual<T>(NativeSlice<T> expected, ReadOnlySpan<T> actual, IEqualityComparer<T> eq) where T : struct, IEquatable<T> {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, T, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!eq.Equals(actual[i], expected[i])) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
+            }
+        }
+
+        public static void AreEqual<T>(ReadOnlySpan<T> expected, NativeSlice<T> actual, IEqualityComparer<T> eq) where T : struct, IEquatable<T> {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, T, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!eq.Equals(actual[i], expected[i])) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
+            }
+        }
+
+        public static void AreEqual<T>(NativeSlice<T> expected, NativeSlice<T> actual, IEqualityComparer<T> eq) where T : struct, IEquatable<T> {
             Assert.AreEqual(expected.Length, actual.Length);
             var notEqual = new List<(int, T, T)>(actual.Length);
             for (int i = 0; i < actual.Length; ++i) {
@@ -55,6 +141,19 @@ namespace Pixelism.Test {
 
         // same
         public static void AreEqual<T>(T expected, ReadOnlySpan<T> actual) where T : IEquatable<T> {
+            var notEqual = new List<(int, T)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!actual[i].Equals(expected)) {
+                    notEqual.Add((i, actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => i.Item1.ToString() + ": " + i.Item2.ToString()));
+                Assert.Fail($"Expected: {expected}\r\n  But was:  {message}");
+            }
+        }
+
+        public static void AreEqual<T>(T expected, NativeSlice<T> actual) where T : struct, IEquatable<T> {
             var notEqual = new List<(int, T)>(actual.Length);
             for (int i = 0; i < actual.Length; ++i) {
                 if (!actual[i].Equals(expected)) {

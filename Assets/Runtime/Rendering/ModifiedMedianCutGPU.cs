@@ -123,7 +123,7 @@ namespace Pixelism {
                 // population iteration
                 for (int i = 0; i < maxIteration; ++i) {
                     medianCut.FindCuttingVolume(command, volumeBuffer, scratchBuffer, indirectBuffer, num);
-                    medianCut.BuildAxisHistogram(command, volumeBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
+                    medianCut.BuildAxis(command, volumeBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
                     medianCut.CutVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
                     medianCut.CountVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, indirectBuffer, false);
                 }
@@ -136,7 +136,7 @@ namespace Pixelism {
                     // population * volume iteration
                     for (int i = 0; i < maxIteration; ++i) {
                         medianCut.FindCuttingVolume(command, volumeBuffer, scratchBuffer, indirectBuffer, num);
-                        medianCut.BuildAxisHistogram(command, volumeBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
+                        medianCut.BuildAxis(command, volumeBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
                         medianCut.CutVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
                         medianCut.CountVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, indirectBuffer, true);
                     }

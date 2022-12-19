@@ -9,7 +9,7 @@ namespace Pixelism {
         private ComputeShader shader;
         private KernelData _SetupVolume;
         private KernelData _FindCuttingVolume;
-        private KernelData _BuildAxisHistogram;
+        private KernelData _BuildAxis;
         private KernelData _CutVolume;
         private KernelData _CountVolume;
         private KernelData _UpdatePriority;
@@ -23,7 +23,7 @@ namespace Pixelism {
                 shader = res;
                 _SetupVolume = new KernelData(shader, "SetupVolume"); // 2pass目のセットアップもこれでできるとよい
                 _FindCuttingVolume = new KernelData(shader, "FindCuttingVolume");
-                _BuildAxisHistogram = new KernelData(shader, "BuildAxisHistogram"); // sum upもlocal index=0でできるとよい
+                _BuildAxis = new KernelData(shader, "BuildAxis"); // sum upもlocal index=0でできるとよい
                 _CutVolume = new KernelData(shader, "CutVolume"); // ↑で出来ると良い
                 _CountVolume = new KernelData(shader, "CountVolume");
                 _UpdatePriority = new KernelData(shader, "UpdatePriority");
@@ -77,8 +77,8 @@ namespace Pixelism {
         }
 
         // シェーダ内で無効判定するとgroupsharedが複雑なので、indirectのほうがよい
-        public void BuildAxisHistogram(CommandBuffer command, ComputeBuffer volumes, ComputeBuffer scratch, ComputeBuffer histogram, ComputeBuffer sumPerAxis, ComputeBuffer indirect) {
-            var pass = _BuildAxisHistogram;
+        public void BuildAxis(CommandBuffer command, ComputeBuffer volumes, ComputeBuffer scratch, ComputeBuffer histogram, ComputeBuffer sumPerAxis, ComputeBuffer indirect) {
+            var pass = _BuildAxis;
             using (pass.SamplingScope(command)) {
                 SetKeywords(command);
                 command.SetComputeBufferParam(pass.shader, pass.kernel, "_Histogram", histogram);
