@@ -50,7 +50,7 @@ Figure 3. Comparison of [PicoChan](https://assetstore.unity.com/packages/3d/char
 |-|-|
 |[<img src="Images/Pixelism-Photo-MMCQ.png" />](Images/Pixelism-Photo-MMCQ.png)|[<img src="Images/Pixelism-Photo-Source.png" />](Images/Pixelism-Photo-Source.png)|
 
-Figure 4. Comparison of photo images (1920 x 1200)
+Figure 4. Comparison of photo images (512 x 512)
 
 
 ### Performance
@@ -69,6 +69,8 @@ Table 1. The palette generation time of Demo scene by rendering resolution (Widt
 ## Discussion
 
 When a scene is moved, the color palette generated may change significantly from that of the previous frame. As a result, the color tones of dithered image may change significantly between frames.
+By the same token Unity's Post Processing cause unstable color palette. because of it jitter the camera regardless of anti-aliasing settings.
+
 
 Since the current focus is on color palette generation, the dithering and color selection algorithm is simple. The color selection may not be as good as the pixel art drawn by the artists.
 
@@ -91,7 +93,6 @@ Figure 6. Black shirt changed dark green is caused by background (color palette 
 - Masking area for palette generation and dithering
 - More better palette generation algorithm
 - More better dithering and palette selection algorithm
-
 
 # License
 - Those assets in `Assets/UTJ` are provided Unity-Chan License Terms ([en](https://unity-chan.com/contents/license_en/)/[ja](https://unity-chan.com/contents/license_ja/))

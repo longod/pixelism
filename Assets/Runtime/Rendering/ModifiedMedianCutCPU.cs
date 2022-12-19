@@ -109,7 +109,7 @@ namespace Pixelism {
 
                 // TODO histogramの1以上がnum color以下の場合、直に生成すればよい
 
-                using (NativeArray<ColorVolume> volumes = new NativeArray<ColorVolume>(NumColor, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
+                using (NativeArray<ColorVolumeCPU> volumes = new NativeArray<ColorVolumeCPU>(NumColor, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
 
                     // set 1st volume
                     if (FullColorSpace) {
@@ -157,17 +157,17 @@ namespace Pixelism {
             Profiler.EndSample();
         }
 
-        private static void SetupFullColorSpace(NativeSlice<ColorVolume> volumes, uint3 max, int length) {
-            volumes[0] = new ColorVolume(uint3.zero, max, (uint)length, false); // countはpixelと同じ数になるはず
+        private static void SetupFullColorSpace(NativeSlice<ColorVolumeCPU> volumes, uint3 max, int length) {
+            volumes[0] = new ColorVolumeCPU(uint3.zero, max, (uint)length, false); // countはpixelと同じ数になるはず
         }
 
-        private static void UpdatePriority(NativeSlice<ColorVolume> volumes, bool populationWithVolume = true) {
+        private static void UpdatePriority(NativeSlice<ColorVolumeCPU> volumes, bool populationWithVolume = true) {
             for (int i = 0; i < volumes.Length; ++i) {
                 volumes[i] = volumes[i].UpdatePriority(populationWithVolume);
             }
         }
 
-        private static int Cut<T>(NativeArray<ColorVolume> volumes, NativeArray<uint> histogram, int paletteCount, int numColor, bool populationWithVolume, in BitInfo bit, T[] converters, int maxIterations = 64) where T : struct, IIndexConverter {
+        private static int Cut<T>(NativeArray<ColorVolumeCPU> volumes, NativeArray<uint> histogram, int paletteCount, int numColor, bool populationWithVolume, in BitInfo bit, T[] converters, int maxIterations = 64) where T : struct, IIndexConverter {
             // 外で確保すれば1回アロケートを減らせるが…
             using (NativeArray<uint> sumPerAxis = new NativeArray<uint>(bit.channelSize, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
 
@@ -243,7 +243,7 @@ namespace Pixelism {
             return paletteCount;
         }
 
-        private static int FindCuttingVolume(NativeSlice<ColorVolume> volumes) {
+        private static int FindCuttingVolume(NativeSlice<ColorVolumeCPU> volumes) {
             if (volumes.Length == 0) {
                 return -1;
             }
@@ -459,13 +459,13 @@ namespace Pixelism {
 
         // 16bit未満のレンジだとushortも使えるが、高速化に寄与するかは不明
         [StructLayout(LayoutKind.Sequential)]
-        internal readonly struct ColorVolume {
+        public readonly struct ColorVolumeCPU {
             public readonly uint count; // offset 0 で書き込むジョブがあるので先頭
             public readonly uint3 min;
             public readonly uint3 max;
             public readonly ulong priority; // propertyで get functionでflagで count返すか、 count * volume返す方がよさそう。後者は32bitだとoverflowする可能性がある
 
-            public ColorVolume(uint3 min, uint3 max, uint count, bool populationWithVolume) {
+            public ColorVolumeCPU(uint3 min, uint3 max, uint count, bool populationWithVolume) {
                 this.min = min;
                 this.max = max;
                 this.count = count;
@@ -473,7 +473,7 @@ namespace Pixelism {
                 this.priority = populationWithVolume ? (count * Volume) : count;
             }
 
-            public ColorVolume(uint3 min, uint3 max) {
+            public ColorVolumeCPU(uint3 min, uint3 max) {
                 this.min = min;
                 this.max = max;
                 this.count = 0; // later
@@ -487,8 +487,8 @@ namespace Pixelism {
                 }
             }
 
-            public ColorVolume UpdatePriority(bool populationWithVolume) {
-                return new ColorVolume(min, max, count, populationWithVolume);
+            public ColorVolumeCPU UpdatePriority(bool populationWithVolume) {
+                return new ColorVolumeCPU(min, max, count, populationWithVolume);
             }
 
             public int ComputeAxis() {
@@ -547,14 +547,14 @@ namespace Pixelism {
         [BurstCompile]
         internal struct MinMaxVolumeJob<T> : IJob where T : IIndexConverter {
 
-            public MinMaxVolumeJob(NativeArray<uint> pixels, NativeSlice<ColorVolume> volume, T conv) {
+            public MinMaxVolumeJob(NativeArray<uint> pixels, NativeSlice<ColorVolumeCPU> volume, T conv) {
                 this.pixels = pixels;
                 this.volume = volume;
                 this.conv = conv;
             }
 
             [ReadOnly] private NativeArray<uint> pixels;
-            [WriteOnly, NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolume> volume;
+            [WriteOnly, NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolumeCPU> volume;
             private readonly T conv;
 
             // Interlocked compareで頑張ればparallelでいけるが…
@@ -567,7 +567,7 @@ namespace Pixelism {
                     min = math.min(min, n);
                     max = math.max(max, n);
                 }
-                volume[0] = new ColorVolume(min, max, (uint)pixels.Length, false);
+                volume[0] = new ColorVolumeCPU(min, max, (uint)pixels.Length, false);
             }
 
         }
@@ -594,7 +594,7 @@ namespace Pixelism {
         [BurstCompile]
         internal unsafe struct BuildAxisHistogramJob<T> : IJobParallelFor where T : IIndexConverter {
 
-            public BuildAxisHistogramJob(NativeArray<uint> histogram, NativeSlice<ColorVolume> volume, NativeArray<uint> sumPerAxis, T conv) {
+            public BuildAxisHistogramJob(NativeArray<uint> histogram, NativeSlice<ColorVolumeCPU> volume, NativeArray<uint> sumPerAxis, T conv) {
                 this.histogram = histogram;
                 this.volume = volume;
                 this.sumPerAxis = sumPerAxis;
@@ -602,7 +602,7 @@ namespace Pixelism {
             }
 
             [ReadOnly] private NativeArray<uint> histogram;
-            [ReadOnly, NativeFixedLength(1)] private NativeSlice<ColorVolume> volume;
+            [ReadOnly, NativeFixedLength(1)] private NativeSlice<ColorVolumeCPU> volume;
             [WriteOnly, NativeDisableParallelForRestriction] private NativeArray<uint> sumPerAxis;
             private readonly T conv;
 
@@ -641,13 +641,13 @@ namespace Pixelism {
         [BurstCompile]
         internal struct SumupAxisHistogramJob<T> : IJob where T : IIndexConverter {
 
-            public SumupAxisHistogramJob(NativeSlice<ColorVolume> volume, NativeArray<uint> sumPerAxis, T conv) {
+            public SumupAxisHistogramJob(NativeSlice<ColorVolumeCPU> volume, NativeArray<uint> sumPerAxis, T conv) {
                 this.volume = volume;
                 this.sumPerAxis = sumPerAxis;
                 this.conv = conv;
             }
 
-            [ReadOnly, NativeFixedLength(1)] private NativeSlice<ColorVolume> volume;
+            [ReadOnly, NativeFixedLength(1)] private NativeSlice<ColorVolumeCPU> volume;
             private NativeArray<uint> sumPerAxis;
             private readonly T conv;
 
@@ -668,7 +668,7 @@ namespace Pixelism {
         [BurstCompile]
         internal struct CutVolumeJob<T> : IJob where T : IIndexConverter {
 
-            public CutVolumeJob(NativeSlice<ColorVolume> src, NativeSlice<ColorVolume> dest0, NativeArray<uint> sumPerAxis, T conv) {
+            public CutVolumeJob(NativeSlice<ColorVolumeCPU> src, NativeSlice<ColorVolumeCPU> dest0, NativeArray<uint> sumPerAxis, T conv) {
                 this.inout = src;
                 this.output = dest0;
                 this.sumPerAxis = sumPerAxis;
@@ -677,8 +677,8 @@ namespace Pixelism {
 
             // TODO or given written index
 
-            [NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolume> inout;
-            [WriteOnly, NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolume> output;
+            [NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolumeCPU> inout;
+            [WriteOnly, NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolumeCPU> output;
             [ReadOnly] private NativeArray<uint> sumPerAxis;
             private readonly T conv;
 
@@ -702,10 +702,10 @@ namespace Pixelism {
                         } else {
                             max[swizzle.x] = math.min(vol.max[swizzle.x] - 1, i + right / 2);
                         }
-                        ColorVolume vbox1 = new ColorVolume(vol.min, max);
+                        ColorVolumeCPU vbox1 = new ColorVolumeCPU(vol.min, max);
                         var min = vol.min;
                         min[swizzle.x] = vbox1.max[swizzle.x] + 1;
-                        var vbox2 = new ColorVolume(min, vol.max);
+                        var vbox2 = new ColorVolumeCPU(min, vol.max);
 
                         inout[0] = vbox1;
                         output[0] = vbox2;
@@ -725,7 +725,7 @@ namespace Pixelism {
         [BurstCompile]
         internal unsafe struct CountVolumeJob<T> : IJobParallelFor where T : IIndexConverter {
 
-            public CountVolumeJob(NativeArray<uint> histogram, NativeSlice<ColorVolume> volume, T conv) {
+            public CountVolumeJob(NativeArray<uint> histogram, NativeSlice<ColorVolumeCPU> volume, T conv) {
                 this.histogram = histogram;
                 this.volume = volume;
                 this.conv = conv;
@@ -734,7 +734,7 @@ namespace Pixelism {
             }
 
             [ReadOnly] private NativeArray<uint> histogram;
-            [NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolume> volume;
+            [NativeFixedLength(1), NativeDisableContainerSafetyRestriction] private NativeSlice<ColorVolumeCPU> volume;
             private readonly T conv;
 
             // batchかjobでtree的に求める方が早くなる可能性はある。が別のバッファも必要
@@ -781,7 +781,7 @@ namespace Pixelism {
         [BurstCompile]
         internal struct ComputeColorJob<T> : IJobParallelFor where T : IIndexConverter {
 
-            public ComputeColorJob(NativeSlice<float3> colorPalette, NativeArray<ColorVolume> volumes, NativeArray<uint> histogram, T conv) {
+            public ComputeColorJob(NativeSlice<float3> colorPalette, NativeArray<ColorVolumeCPU> volumes, NativeArray<uint> histogram, T conv) {
                 this.colorPalette = colorPalette;
                 this.volumes = volumes;
                 this.histogram = histogram;
@@ -789,7 +789,7 @@ namespace Pixelism {
             }
 
             [WriteOnly] private NativeSlice<float3> colorPalette;
-            [ReadOnly] private NativeArray<ColorVolume> volumes;
+            [ReadOnly] private NativeArray<ColorVolumeCPU> volumes;
             [ReadOnly] private NativeArray<uint> histogram;
             private readonly T conv;
 

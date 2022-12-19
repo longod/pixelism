@@ -113,7 +113,7 @@ namespace Pixelism {
 
         private AddressablesHelper.HandleCollector collector = new AddressablesHelper.HandleCollector();
 
-        public GraphicsController() : this(new ModifiedMedianCutCPU(), new PaletteDither()) {
+        public GraphicsController() : this(new ModifiedMedianCutGPU(), new PaletteDither()) {
         }
 
         public GraphicsController(IColorQuantizer colorQuantizer, IColorReduction colorReduction) {

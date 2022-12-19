@@ -8,6 +8,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Pixelism.ModifiedMedianCutCPU;
 
 namespace Pixelism.Test {
 
@@ -36,33 +37,50 @@ namespace Pixelism.Test {
         public struct CacheHistogram : IDisposable {
             private JobHandle handle;
             private NativeArray<uint> data;
+            private NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU> volume;
             private uint[] managed;
 
-            public CacheHistogram(JobHandle handle, NativeArray<uint> data) {
+            public CacheHistogram(JobHandle handle, NativeArray<uint> data, NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU> volume) {
                 this.handle = handle;
                 this.data = data;
+                this.volume = volume;
                 this.managed = null;
             }
 
-            public NativeArray<uint> Value {
+            public NativeArray<uint> Histogram {
                 get {
-                    // 何度も呼ぶとオーバーヘッドなんだけれど
-                    handle.Complete();
+                    handle.Complete(); // 何度も呼ぶとオーバーヘッドなんだけれど
                     return data;
                 }
             }
 
-            public uint[] Managed {
+            public uint[] ManagedHistogram {
                 get {
                     if (managed == null) {
-                        managed = Value.ToArray();
+                        managed = Histogram.ToArray();
                     }
                     return managed;
                 }
             }
 
+            public uint3 Min {
+                get {
+                    handle.Complete();
+                    return volume[0].min;
+                }
+            }
+
+            public uint3 Max {
+                get {
+                    handle.Complete();
+                    return volume[0].max;
+                }
+            }
+
             public void Dispose() {
-                Value.Dispose();
+                handle.Complete();
+                data.Dispose();
+                volume.Dispose();
                 managed = null;
             }
 
@@ -71,9 +89,12 @@ namespace Pixelism.Test {
                     throw new ArgumentException("source format is not RGBA32.");
                 }
                 var histogram = ModifiedMedianCutCPU.CreateHistogramBin(converter.Bit, Allocator.Persistent);
-                var handle = new ModifiedMedianCutCPU.BuildHistogramJob<T>(res.GetPixelData<uint>(0), histogram, converter).Schedule();
-                //var handle = new ModifiedMedianCutCPU.MinMaxVolumeJob<T>(res.GetPixelData<uint>(0), volumes, converter).Schedule(); // todo
-                return new CacheHistogram(handle, histogram);
+                var volume = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(1, Allocator.Persistent);
+                var pixels = res.GetPixelData<uint>(0);
+                var build = new ModifiedMedianCutCPU.BuildHistogramJob<T>(pixels, histogram, converter).Schedule();
+                var minmax = new ModifiedMedianCutCPU.MinMaxVolumeJob<T>(pixels, volume, converter).Schedule();
+                JobHandle.ScheduleBatchedJobs(); // 呼ばないと起動が鈍い
+                return new CacheHistogram(JobHandle.CombineDependencies(build, minmax), histogram, volume);
             }
         }
 
@@ -84,7 +105,6 @@ namespace Pixelism.Test {
                 AddressablesHelper.LoadAssetAsync<Texture2D>(key, res => {
                     cachedImage.Add(key, res);
                     cachedHistogram.Add(key, CacheHistogram.Create(res, converters[0]));
-                    JobHandle.ScheduleBatchedJobs(); // 呼ばないと起動が鈍い
                 }).Collect(collector);
             }
             collector.WaitForCompletion();
@@ -111,7 +131,7 @@ namespace Pixelism.Test {
         }
 
         [Test, Order(-1)]
-        public void ClearHistogram([Values(false, true)] bool fullRange) {
+        public void ClearHistogram([Values(true, false)] bool fullColorRange) {
             using (var histogramBuffer = Histogram.CreateHistogramBuffer()) {
                 Assert.AreEqual(Marshal.SizeOf<uint>(), histogramBuffer.stride);
                 Assert.AreEqual(4096, histogramBuffer.count);
@@ -120,7 +140,7 @@ namespace Pixelism.Test {
                     Assert.AreEqual(Marshal.SizeOf<uint3>(), minmaxBuffer.stride);
                     Assert.AreEqual(2, minmaxBuffer.count);
 
-                    histogram.Clear(command, histogramBuffer, minmaxBuffer, fullRange);
+                    histogram.Clear(command, histogramBuffer, minmaxBuffer, fullColorRange);
                     Graphics.ExecuteCommandBuffer(command);
 
                     {
@@ -131,7 +151,7 @@ namespace Pixelism.Test {
                     {
                         uint3[] actual = new uint3[minmaxBuffer.count];
                         minmaxBuffer.GetData(actual);
-                        if (fullRange) {
+                        if (fullColorRange) {
                             Assert.AreEqual(new uint3(0x0), actual[0]);
                             Assert.AreEqual(new uint3(0xF, 0xF, 0xF), actual[1]);
                         } else {
@@ -143,14 +163,11 @@ namespace Pixelism.Test {
             }
         }
 
-        [TestCaseSource(nameof(TestImage))]
-        public void BuildHistogram(string key) {
-            var histo = cachedHistogram[key];
+
+        [Test]
+        public void BuildHistogram([ValueSource(nameof(TestImage))] string key, [Values(true, false)] bool fullColorRange) {
+            var expected = cachedHistogram[key];
             var image = cachedImage[key];
-
-            bool fullRange = false; // todo parameter
-
-            var expected = histo.Managed;
 
             using (var histogramBuffer = Histogram.CreateHistogramBuffer()) {
                 Assert.AreEqual(histogramBuffer.stride, Marshal.SizeOf<uint>());
@@ -159,31 +176,29 @@ namespace Pixelism.Test {
                     Assert.AreEqual(Marshal.SizeOf<uint3>(), minmaxBuffer.stride);
                     Assert.AreEqual(2, minmaxBuffer.count);
 
-                    histogram.Clear(command, histogramBuffer, minmaxBuffer, fullRange);
-                    histogram.Build(command, image, histogramBuffer, image.width, image.height, minmaxBuffer, fullRange);
+                    histogram.Clear(command, histogramBuffer, minmaxBuffer, fullColorRange);
+                    histogram.Build(command, image, histogramBuffer, image.width, image.height, minmaxBuffer, fullColorRange);
                     Graphics.ExecuteCommandBuffer(command);
                     {
                         uint[] actual = new uint[histogramBuffer.count];
                         histogramBuffer.GetData(actual);
                         Assert.AreEqual(image.width * image.height, actual.Sum(x => x));
 
-                        // 誤差は避けられないが、どれくらい必要か。累積的なので絶対値で決められない。
+                        // GPUのfloat<->uint変換で誤差は避けられないが、どれくらい必要か。累積的なので絶対値で決められない。
                         // 隣接する前後を足し合わせて n%以内とか？
                         // 厳密なら、誤差でbinningが分かれそうな境界付近の値を調べる
                         // シンプルな誤差の出にくいデータセットを用意する
-                        AssertHelper.AreEqual<uint>(expected, actual);
-                        //AssertHelper.AreEqual<uint>(expected, actual, new UintAbsoluteEqualityComparer(1));
+                        AssertHelper.AreEqual<uint>(expected.ManagedHistogram, actual);
                     }
                     {
                         uint3[] actual = new uint3[minmaxBuffer.count];
                         minmaxBuffer.GetData(actual);
-                        // todo
-                        if (fullRange) {
+                        if (fullColorRange) {
                             Assert.AreEqual(new uint3(0x0), actual[0]);
                             Assert.AreEqual(new uint3(0xF, 0xF, 0xF), actual[1]);
                         } else {
-                            Assert.AreEqual(new uint3(0xFFFFFFFF), actual[0]);
-                            Assert.AreEqual(new uint3(0), actual[1]);
+                            Assert.AreEqual(expected.Min, actual[0]);
+                            Assert.AreEqual(expected.Max, actual[1]);
                         }
                     }
 

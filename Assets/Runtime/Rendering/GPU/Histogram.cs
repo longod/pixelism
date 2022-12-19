@@ -11,11 +11,14 @@ namespace Pixelism {
         private KernelData buildPass;
         private KernelData clearPass;
         private LocalKeyword minmaxKeyword;
+        private static readonly int _MinMax = Shader.PropertyToID("_MinMax");
+        private static readonly int _Histogram = Shader.PropertyToID("_Histogram");
+        private static readonly int _Source = Shader.PropertyToID("_Source");
+        private static readonly int _Dimensions = Shader.PropertyToID("_Dimensions");
 
-        //private KernelData buildPartialPass;
         private AddressablesHelper.HandleCollector collector = new AddressablesHelper.HandleCollector();
 
-        private const int channelBit = 4;
+        private const int channelBit = 4; // gpuと同じ
         private const int histogramBit = channelBit * 3; // rgb
         private const int histogramSize = 1 << histogramBit;
 
@@ -45,30 +48,31 @@ namespace Pixelism {
             command.SetKeyword(shader, minmaxKeyword, minmax);
         }
 
-        public void Build(CommandBuffer command, RenderTargetIdentifier source, ComputeBuffer histogram, int width, int height, ComputeBuffer minmax, bool fullRange) {
+        public void Clear(CommandBuffer command, ComputeBuffer histogram, ComputeBuffer minmax, bool fullColorRange) {
+            var pass = clearPass;
+            using (pass.SamplingScope(command)) {
+                SetKeywords(command, !fullColorRange);
+                command.SetComputeBufferParam(pass.shader, pass.kernel, _MinMax, minmax);
+                command.SetComputeBufferParam(pass.shader, pass.kernel, _Histogram, histogram);
+                int threadGroupsX = Math.DivRoundUp(histogram.count, (int)pass.threadGroupSizes.x);
+                command.DispatchCompute(pass.shader, pass.kernel, threadGroupsX, 1, 1);
+            }
+        }
+
+        public void Build(CommandBuffer command, RenderTargetIdentifier source, ComputeBuffer histogram, int width, int height, ComputeBuffer minmax, bool fullColorRange) {
             // 暗黙的にclearしてもよい
 
             var pass = buildPass;
             using (pass.SamplingScope(command)) {
-                SetKeywords(command, minmax != null);
-                command.SetComputeBufferParam(pass.shader, pass.kernel, "_MinMax", minmax);
-                command.SetComputeBufferParam(pass.shader, pass.kernel, "_Histogram", histogram);
-                command.SetComputeTextureParam(pass.shader, pass.kernel, "_Source", source, 0);
-                command.SetComputeIntParams(pass.shader, "_Dimensions", width, height, 0, 0);
+                SetKeywords(command, !fullColorRange);
+                command.SetComputeBufferParam(pass.shader, pass.kernel, _MinMax, minmax);
+                command.SetComputeBufferParam(pass.shader, pass.kernel, _Histogram, histogram);
+                command.SetComputeTextureParam(pass.shader, pass.kernel, _Source, source, 0);
+                command.SetComputeIntParams(pass.shader, _Dimensions, width, height, 0, 0);
                 int2 threadGroups = Math.DivRoundUp(new int2(width, height), (int2)pass.threadGroupSizes.xy);
                 command.DispatchCompute(pass.shader, pass.kernel, threadGroups.x, threadGroups.y, 1);
             }
         }
 
-        public void Clear(CommandBuffer command, ComputeBuffer histogram, ComputeBuffer minmax, bool fullRange) {
-            var pass = clearPass;
-            using (pass.SamplingScope(command)) {
-                SetKeywords(command, !fullRange);
-                command.SetComputeBufferParam(pass.shader, pass.kernel, "_MinMax", minmax);
-                command.SetComputeBufferParam(pass.shader, pass.kernel, "_Histogram", histogram);
-                int threadGroupsX = Math.DivRoundUp(histogram.count, (int)pass.threadGroupSizes.x);
-                command.DispatchCompute(pass.shader, pass.kernel, threadGroupsX, 1, 1);
-            }
-        }
     }
 }
