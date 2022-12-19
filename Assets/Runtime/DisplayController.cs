@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using UnityEngine;
+using UnityEngine.Playables;
 using UnityEngine.Rendering;
 
 namespace Pixelism {
@@ -21,13 +22,27 @@ namespace Pixelism {
 
         private Screenshot screenshot = null;
         private string directory = "Screenshot";
-        private string prefix = "Screenshot_";
+        private string prefixScreenshot = "Screenshot_";
+        private string prefixBurst = "Burst_";
         private Screenshot.FileFormat format = Screenshot.FileFormat.PNG;
+        private bool enableBurstShot = false;
+        private uint burstCount = 0;
+        private string prefixCurrentBurst = null;
+        private int captureFramerate = 60;
+        private string saveDirectory;
 
         // gui
         public bool Menu { get; set; } = true;
 
         public bool MenuVisibility { get; set; } = true;
+
+        private void Start() {
+            var path = Application.persistentDataPath;
+            if (!string.IsNullOrWhiteSpace(directory)) {
+                path = Path.Combine(path, directory);
+            }
+            saveDirectory = path;
+        }
 
         private void OnEnable() {
             if (target == null) {
@@ -61,6 +76,8 @@ namespace Pixelism {
             }
             if (Input.GetKeyDown(KeyCode.F4)) {
                 CaptureScreenshotAsync();
+            } else if (Input.GetKeyDown(KeyCode.F8)) {
+                ToggleScreenshotBurstAsync();
             }
 
             if (Input.GetKeyDown(KeyCode.Escape)) {
@@ -71,6 +88,7 @@ namespace Pixelism {
         private void LateUpdate() {
             timer.Capture();
             timer.Aquire();
+            CaptureBurstScreenshotAsync();
         }
 
         private void OnPreRender() {
@@ -122,22 +140,55 @@ namespace Pixelism {
         }
 
         public void CaptureScreenshotAsync() {
+            if (enableBurstShot) {
+                return;
+            }
+
             if (screenshot == null) {
                 screenshot = new Screenshot();
             }
             try {
-                var path = Application.persistentDataPath;
-                if (!string.IsNullOrWhiteSpace(directory)) {
-                    path = Path.Combine(path, directory);
-                    if (!Directory.Exists(path)) {
-                        Directory.CreateDirectory(path);
-                    }
+                if (!Directory.Exists(saveDirectory)) {
+                    Directory.CreateDirectory(saveDirectory);
                 }
-                var filename = string.Concat(prefix, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss.fff_"), Time.frameCount, Screenshot.GetExtension(format));
-                path = Path.Combine(path, filename);
-                StartCoroutine(screenshot.CaptureAsync(path, format));
+                var filename = string.Concat(prefixScreenshot, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss.fff_"), Time.frameCount, Screenshot.GetExtension(format));
+                var path = Path.Combine(saveDirectory, filename);
+                StartCoroutine(screenshot.CaptureAsync(path, Screenshot.FileFormat.PNG));
             } catch (Exception e) {
                 Debug.LogError(e);
+            }
+        }
+
+        public void CaptureBurstScreenshotAsync() {
+            if (!enableBurstShot) {
+                return;
+            }
+
+            try {
+                var filename = string.Concat(prefixCurrentBurst, burstCount++, Screenshot.GetExtension(format));
+                var path = Path.Combine(saveDirectory, filename);
+                StartCoroutine(screenshot.CaptureAsync(path, format, false));
+            } catch (Exception e) {
+                Debug.LogError(e);
+            }
+        }
+
+        public void ToggleScreenshotBurstAsync() {
+            enableBurstShot = !enableBurstShot;
+            if (enableBurstShot) {
+                if (!Directory.Exists(saveDirectory)) {
+                    Directory.CreateDirectory(saveDirectory);
+                }
+                if (screenshot == null) {
+                    screenshot = new Screenshot();
+                }
+                burstCount = 0;
+                prefixCurrentBurst = string.Concat(prefixBurst, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss.fff_"));
+                Time.captureFramerate = captureFramerate;
+                Debug.Log("Start to capture screenshot bursting...");
+            } else {
+                Debug.Log("End to capture screenshot bursting...");
+                Time.captureFramerate = 0; // reset
             }
         }
 

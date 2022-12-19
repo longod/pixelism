@@ -220,16 +220,16 @@ namespace Pixelism {
                 }).ToArray();
             }
 
-            if (darkMinus != null) {
+            if (darkMinus == null) {
                 darkMinus = EditorGUIUtility.IconContent("d_Toolbar Minus");
             }
-            if (darkPlus != null) {
+            if (darkPlus == null) {
                 darkPlus = EditorGUIUtility.IconContent("d_Toolbar Plus");
             }
-            if (lightMinus != null) {
+            if (lightMinus == null) {
                 lightMinus = EditorGUIUtility.IconContent("Toolbar Minus");
             }
-            if (lightPlus != null) {
+            if (lightPlus == null) {
                 lightPlus = EditorGUIUtility.IconContent("Toolbar Plus");
             }
 

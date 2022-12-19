@@ -19,7 +19,7 @@ namespace Pixelism {
             EXR,
         }
 
-        public IEnumerator CaptureAsync(string uniquedPath, FileFormat format) {
+        public IEnumerator CaptureAsync(string uniquedPath, FileFormat format, bool outputLog = true) {
             yield return new WaitForEndOfFrame();
             int width = Screen.width;
             int height = Screen.height;
@@ -32,13 +32,13 @@ namespace Pixelism {
                 buffers[index].request = AsyncGPUReadback.Request(buffers[index].renderTexture, 0, graphicsFormat,
                     request => {
                         if (request.done && !request.hasError && !disposed) {
-                            ReadbackCompleted(request, uniquedPath, format, buffers[index].renderTexture);
+                            ReadbackCompleted(request, uniquedPath, format, buffers[index].renderTexture, outputLog);
                         }
                     });
             }
         }
 
-        private void ReadbackCompleted(AsyncGPUReadbackRequest request, string path, FileFormat format, RenderTexture renderTexture) {
+        private void ReadbackCompleted(AsyncGPUReadbackRequest request, string path, FileFormat format, RenderTexture renderTexture, bool outputLog) {
             // exclude sampler
             if (flipSampler == null) {
                 flipSampler = CustomSampler.Create("Screenshot.FlipY");
@@ -85,7 +85,9 @@ namespace Pixelism {
                 Profiler.EndThreadProfiling();
             });
 
-            Debug.Log("Capture Screenshot: " + path); // 厳密にはキャプチャはしたが、ファイル出力していない状態
+            if (outputLog) {
+                Debug.Log("Capture Screenshot: " + path); // 厳密にはキャプチャはしたが、ファイル出力していない状態
+            }
         }
 
         private static bool NeedToFlipY() {

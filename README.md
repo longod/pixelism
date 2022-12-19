@@ -68,7 +68,6 @@ Table 1. The palette generation time of Demo scene by rendering resolution (Widt
 
 ## Discussion
 
-
 When a scene is moved, the color palette generated may change significantly from that of the previous frame. As a result, the color tones of dithered image may change significantly between frames.
 
 Since the current focus is on color palette generation, the dithering and color selection algorithm is simple. The color selection may not be as good as the pixel art drawn by the artists.
@@ -77,9 +76,13 @@ The background may be too dominant and color palette may not be generated in foc
 
 Many dispatches are causing some overhead. This could be minimized if [ID3D12GraphicsCommandList::ExecuteIndirect](https://learn.microsoft.com/windows/win32/api/d3d12/nf-d3d12-id3d12graphicscommandlist-executeindirect) could be used, but cannot be used in unity.
 
+[<img src="Images/Pixelism-Temporal-LackOfRobustness.gif" />](Images/Pixelism-Temporal-LackOfRobustness.gif)
+
+Figure 5. Lack of robustness for temporal (color palette is shown in top-left)
+
 [<img src="Images/Pixelism-Dominant-Background.png" />](Images/Pixelism-Dominant-Background.png)
 
-Figure 5. Black shirt changed dark green is caused by background (color palette is shown in top-left)
+Figure 6. Black shirt changed dark green is caused by background (color palette is shown in top-left)
 
 
 ## Future Work
