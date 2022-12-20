@@ -115,7 +115,7 @@ namespace Pixelism {
         }
 
         public void UpdatePriority(CommandBuffer command, ComputeBuffer volumes, ComputeBuffer scratch, bool populationProductVolume = true) {
-            var pass = _SetupVolume;
+            var pass = _UpdatePriority;
             using (pass.SamplingScope(command)) {
                 SetKeywords(command, populationProductVolume: populationProductVolume);
                 command.SetKeyword(pass.shader, priorityKeyword, populationProductVolume);

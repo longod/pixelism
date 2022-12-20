@@ -11,12 +11,12 @@ namespace Pixelism {
         private KernelData buildPass;
         private KernelData clearPass;
         private LocalKeyword minmaxKeyword;
+        private AddressablesHelper.HandleCollector collector = new AddressablesHelper.HandleCollector();
         private static readonly int _MinMax = Shader.PropertyToID("_MinMax");
         private static readonly int _Histogram = Shader.PropertyToID("_Histogram");
         private static readonly int _Source = Shader.PropertyToID("_Source");
         private static readonly int _Dimensions = Shader.PropertyToID("_Dimensions");
 
-        private AddressablesHelper.HandleCollector collector = new AddressablesHelper.HandleCollector();
 
         private const int channelBit = 4; // gpuと同じ
         private const int histogramBit = channelBit * 3; // rgb
