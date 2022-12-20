@@ -94,7 +94,7 @@ void SetupVolume(uint id : SV_DispatchThreadID) {
     Scratch scratch;
     scratch.volumeCount = 1;
     scratch.index = 0;
-    scratch.swizzle = uint3(0, 1, 2);
+    scratch.swizzle = uint3(0, 1, 2); // なんでもよい
     scratch.normalizer = 1.0f;
     _Scratch[0] = scratch;
 
