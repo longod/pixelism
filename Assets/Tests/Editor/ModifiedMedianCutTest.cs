@@ -122,17 +122,17 @@ namespace Pixelism.Test {
             uint3 min;
             uint3 max;
             switch (volumeCount % 3) {
-                case 0: // x
+                case 0: // z
                     min = new uint3(0, 1, 2);
-                    max = new uint3(6, 7, 8);
+                    max = new uint3(8, 7, 6);
                     break;
                 case 1: // y
                     min = new uint3(0, 2, 1);
-                    max = new uint3(7, 8, 6);
+                    max = new uint3(6, 9, 7);
                     break;
                 case 2: // z
                     min = new uint3(2, 1, 0);
-                    max = new uint3(6, 8, 6);
+                    max = new uint3(2, 4, 6);
                     break;
                 default:
                     throw new ArgumentException();
@@ -170,38 +170,39 @@ namespace Pixelism.Test {
             }
         }
 
-        [TestCaseSource(nameof(TestImage))]
-        public void BuildAxis(string key) {
-            var image = cachedImage[key];
+        [Test]
+        public void BuildAxis([ValueSource(nameof(TestImage))] string key, [Values(0, 1, 2)] int axis, [Values(0u, 7u)] uint min, [Values(0xfu, 8u, 7u)] uint max) {
             var histo = cachedHistogram[key];
-
             histogramBuffer.SetData(histo.Histogram);
 
-            using (var volumesBuffer = new ComputeBuffer(1, Marshal.SizeOf<ColorVolume>())) {
-                // todo change range
-                var volumes = new ColorVolume[1] { new ColorVolume() { count = 0, max = new uint3(0xf, 0xf, 0xf), min = new uint3(0, 0, 0), priority = 0 } };
-                volumesBuffer.SetData(volumes);
+            // min, maxのみが必要
+            var volumes = Enumerable.Repeat(new ColorVolume() { min = new uint3(min, min, min), max = new uint3(max, max, max), count = 0, priority = 0 }, 16).ToArray();
+            var index = volumes.Length - 1; // なんでもいいが0以外がベター
+            var converter = converters[axis];
 
-                using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
-                    scratchBuffer.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = new uint3(0, 1, 2) } });
+            using (NativeArray<uint> expected = new NativeArray<uint>(converter.ChannelSize, Allocator.TempJob, NativeArrayOptions.ClearMemory)) {
+                using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max, x.count, false)).ToArray(), Allocator.TempJob)) {
+                    var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(index, 1), expected, converter).Schedule();
+                    var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vol.Slice(index, 1), expected, converter).Schedule(build);
+                    JobHandle.ScheduleBatchedJobs();
 
-                    using (var sumPerAxisBuffer = ModifiedMedianCut.CreateAxisBuffer()) {
+                    using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
+                        volumesBuffer.SetData(volumes);
 
-                        medianCut.BuildAxis(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
+                        using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                            scratchBuffer.SetData(new Scratch() { index = index, volumeCount = (uint)volumes.Length, swizzle = (uint3)converter.Swizzle });
 
-                        Graphics.ExecuteCommandBuffer(command);
+                            using (var sumPerAxisBuffer = ModifiedMedianCut.CreateAxisBuffer()) {
 
-                        uint[] actual = new uint[sumPerAxisBuffer.count];
-                        sumPerAxisBuffer.GetData(actual);
+                                medianCut.BuildAxis(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
 
-                        using (NativeArray<uint> sumPerAxis = new NativeArray<uint>(bit.channelSize, Allocator.TempJob, NativeArrayOptions.ClearMemory)) {
-                            using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max)).ToArray(), Allocator.TempJob)) {
+                                Graphics.ExecuteCommandBuffer(command);
 
-                                var conv = converters[0];
-                                var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, conv).Schedule();
-                                var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vol.Slice(0, 1), sumPerAxis, conv).Schedule(build);
+                                uint[] actual = new uint[sumPerAxisBuffer.count];
+                                sumPerAxisBuffer.GetData(actual);
+
                                 sumup.Complete();
-                                AssertHelper.AreEqual<uint>(sumPerAxis.ToArray(), actual);
+                                AssertHelper.AreEqual<uint>(expected, actual);
                             }
                         }
                     }
@@ -212,7 +213,6 @@ namespace Pixelism.Test {
 
         [TestCaseSource(nameof(TestImage))]
         public void CutVolume(string key) {
-            var image = cachedImage[key];
             var histo = cachedHistogram[key];
 
             // todo change range
