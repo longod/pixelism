@@ -89,11 +89,10 @@ namespace Pixelism {
             }
         }
 
-        public void CutVolume(CommandBuffer command, ComputeBuffer volumes, ComputeBuffer scratch, ComputeBuffer histogram, ComputeBuffer sumPerAxis, ComputeBuffer indirect) {
+        public void CutVolume(CommandBuffer command, ComputeBuffer volumes, ComputeBuffer scratch, ComputeBuffer sumPerAxis, ComputeBuffer indirect) {
             var pass = _CutVolume;
             using (pass.SamplingScope(command)) {
                 SetKeywords(command);
-                command.SetComputeBufferParam(pass.shader, pass.kernel, "_Histogram", histogram);
                 command.SetComputeBufferParam(pass.shader, pass.kernel, "_Scratch", scratch);
                 command.SetComputeBufferParam(pass.shader, pass.kernel, "_Volumes", volumes);
                 command.SetComputeBufferParam(pass.shader, pass.kernel, "_SumPerAxis", sumPerAxis);

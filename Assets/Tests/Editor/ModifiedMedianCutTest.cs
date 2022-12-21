@@ -211,54 +211,46 @@ namespace Pixelism.Test {
             }
         }
 
-        [TestCaseSource(nameof(TestImage))]
-        public void CutVolume(string key) {
+        [Test]
+        public void CutVolume([ValueSource(nameof(TestImage))] string key, [Values(0, 1, 2)] int axis, [Values(0u, 7u)] uint min, [Values(0xfu, 8u, 7u)] uint max) {
             var histo = cachedHistogram[key];
 
-            // todo change range
             var volumes = new ColorVolume[] {
-                new ColorVolume() { count = 0, max = new uint3(0xf, 0xf, 0xf), min = new uint3(0, 0, 0), priority = 0 },
+                new ColorVolume() {  min = new uint3(min, min, min), max = new uint3(max, max, max), count = 0, priority = 0 },
                 new ColorVolume(),
             };
+            var converter = converters[axis];
 
-            var conv = converters[0];
+            using (NativeArray<uint> sumPerAxis = new NativeArray<uint>(bit.channelSize, Allocator.TempJob, NativeArrayOptions.ClearMemory)) {
+                using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max, x.count, false)).ToArray(), Allocator.TempJob)) {
+                    var expected1 = vol.Slice(0, 1); // in out
+                    var expected2 = vol.Slice(1, 1); // out
+                    var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, converter).Schedule();
+                    var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(expected1, sumPerAxis, converter).Schedule(build);
+                    var cut = new ModifiedMedianCutCPU.CutVolumeJob<ModifiedMedianCutCPU.DefaultConverter>(expected1, expected2, sumPerAxis, converter).Schedule(sumup);
+                    JobHandle.ScheduleBatchedJobs();
 
-            histogramBuffer.SetData(histo.Histogram);
+                    using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
+                        volumesBuffer.SetData(volumes);
 
-            using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
-                volumesBuffer.SetData(volumes);
+                        using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                            scratchBuffer.SetData(new Scratch() { index = 0, volumeCount = 1, swizzle = (uint3)converter.Swizzle });
 
-                using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
-                    scratchBuffer.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = (uint3)conv.Swizzle } });
+                            using (var sumPerAxisBuffer = ModifiedMedianCut.CreateAxisBuffer()) {
+                                cut.Complete(); // この段階だとsumup まででよいが、sumup, cutの2回complete呼ぶ手間がかかる
+                                sumPerAxisBuffer.SetData(sumPerAxis);
 
-                    using (var sumPerAxisBuffer = ModifiedMedianCut.CreateAxisBuffer()) {
+                                medianCut.CutVolume(command, volumesBuffer, scratchBuffer, sumPerAxisBuffer, indirectBuffer);
 
-                        medianCut.BuildAxis(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer); // TODO これはcpu referenceを使う
-                        medianCut.CutVolume(command, volumesBuffer, scratchBuffer, histogramBuffer, sumPerAxisBuffer, indirectBuffer);
+                                Graphics.ExecuteCommandBuffer(command);
 
-                        Graphics.ExecuteCommandBuffer(command);
+                                ColorVolume[] actual = new ColorVolume[volumesBuffer.count];
+                                volumesBuffer.GetData(actual);
 
-                        ColorVolume[] actual = new ColorVolume[volumesBuffer.count];
-                        volumesBuffer.GetData(actual);
-
-                        using (NativeArray<uint> sumPerAxis = new NativeArray<uint>(bit.channelSize, Allocator.TempJob, NativeArrayOptions.ClearMemory)) {
-                            using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max)).ToArray(), Allocator.TempJob)) {
-
-                                var vbox1 = vol.Slice(0, 1); // in out
-                                var vbox2 = vol.Slice(1, 1); // out
-
-                                //var axis = vbox1[0].ComputeAxis(); // 軸の決定
-                                //var conv = converters[axis];
-
-                                var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(0, 1), sumPerAxis, conv).Schedule();
-                                var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vbox1, sumPerAxis, conv).Schedule(build);
-                                var cut = new ModifiedMedianCutCPU.CutVolumeJob<ModifiedMedianCutCPU.DefaultConverter>(vbox1, vbox2, sumPerAxis, conv).Schedule(sumup);
-                                cut.Complete();
-
-                                Assert.AreEqual(vbox1[0].min, actual[0].min);
-                                Assert.AreEqual(vbox1[0].max, actual[0].max);
-                                Assert.AreEqual(vbox2[0].min, actual[1].min);
-                                Assert.AreEqual(vbox2[0].max, actual[1].max);
+                                Assert.AreEqual(expected1[0].min, actual[0].min);
+                                Assert.AreEqual(expected1[0].max, actual[0].max);
+                                Assert.AreEqual(expected2[0].min, actual[1].min);
+                                Assert.AreEqual(expected2[0].max, actual[1].max);
                             }
                         }
                     }
