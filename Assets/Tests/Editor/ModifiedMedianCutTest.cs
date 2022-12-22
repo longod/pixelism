@@ -180,10 +180,10 @@ namespace Pixelism.Test {
             var index = volumes.Length - 1; // なんでもいいが0以外がベター
             var converter = converters[axis];
 
-            using (NativeArray<uint> expected = new NativeArray<uint>(converter.ChannelSize, Allocator.TempJob, NativeArrayOptions.ClearMemory)) {
-                using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max, x.count, false)).ToArray(), Allocator.TempJob)) {
-                    var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(index, 1), expected, converter).Schedule();
-                    var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vol.Slice(index, 1), expected, converter).Schedule(build);
+            using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max, x.count, false)).ToArray(), Allocator.TempJob)) {
+                using (NativeArray<uint> sumPerAxis = new NativeArray<uint>(converter.ChannelSize, Allocator.TempJob, NativeArrayOptions.ClearMemory)) {
+                    var build = new ModifiedMedianCutCPU.BuildAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(histo.Histogram, vol.Slice(index, 1), sumPerAxis, converter).Schedule();
+                    var sumup = new ModifiedMedianCutCPU.SumupAxisHistogramJob<ModifiedMedianCutCPU.DefaultConverter>(vol.Slice(index, 1), sumPerAxis, converter).Schedule(build);
                     JobHandle.ScheduleBatchedJobs();
 
                     using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
@@ -202,7 +202,7 @@ namespace Pixelism.Test {
                                 sumPerAxisBuffer.GetData(actual);
 
                                 sumup.Complete();
-                                AssertHelper.AreEqual<uint>(expected, actual);
+                                AssertHelper.AreEqual<uint>(sumPerAxis, actual);
                             }
                         }
                     }
@@ -214,7 +214,6 @@ namespace Pixelism.Test {
         [Test]
         public void CutVolume([ValueSource(nameof(TestImage))] string key, [Values(0, 1, 2)] int axis, [Values(0u, 7u)] uint min, [Values(0xfu, 8u, 7u)] uint max) {
             var histo = cachedHistogram[key];
-
             var volumes = new ColorVolume[] {
                 new ColorVolume() {  min = new uint3(min, min, min), max = new uint3(max, max, max), count = 0, priority = 0 },
                 new ColorVolume(),
@@ -259,51 +258,62 @@ namespace Pixelism.Test {
             }
         }
 
-        [TestCaseSource(nameof(TestImage))]
-        public void CountVolume(string key) {
-            var image = cachedImage[key];
-            var histo = cachedHistogram[key];
+        [Test]
+        public void CountVolume([ValueSource(nameof(TestImage))] string key, [Values(0u, 7u)] uint min, [Values(8u, 7u)] uint mid, [Values(0xfu, 8u)] uint max, [Values(false, true)] bool populationProductVolume) {
+            var histogram = cachedHistogram[key].Histogram;
+            histogramBuffer.SetData(histogram);
 
-            // todo change range, priority type
-
+            var lmax = math.max(min, mid);
+            var rmin = math.min(mid, max);
             var volumes = new ColorVolume[] {
-                new ColorVolume() { min = new uint3(0, 0, 0), max = new uint3(0xf, 0xf, 0xf), count = 0, priority = 0 },
-                new ColorVolume() { min = new uint3(0, 0, 0), max = new uint3(0xf, 0xf, 0xf), count = 0, priority = 0 }
+                new ColorVolume() { min = new uint3(min, min, min), max = new uint3(lmax, lmax, lmax), count = 0, priority = 0 },
+                new ColorVolume() { min = new uint3(rmin, rmin, rmin), max = new uint3(max, max, max), count = 0, priority = 0 }
             };
+            float norm = populationProductVolume ? 1.0f / 4096.0f : 1.0f;
+            var converter = converters[0];
 
-            histogramBuffer.SetData(histo.Histogram);
+            using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max)).ToArray(), Allocator.TempJob)) {
+                var expected1 = vol.Slice(0, 1); // in out
+                var expected2 = vol.Slice(1, 1); // out
+                var count1 = new ModifiedMedianCutCPU.CountVolumeJob<ModifiedMedianCutCPU.DefaultConverter>(histogram, expected1, converter).Schedule();
+                var count2 = new ModifiedMedianCutCPU.CountVolumeJob<ModifiedMedianCutCPU.DefaultConverter>(histogram, expected2, converter).Schedule();
+                var handle = JobHandle.CombineDependencies(count1, count2);
+                JobHandle.ScheduleBatchedJobs();
 
-            using (var volumeBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
-                volumeBuffer.SetData(volumes);
-                using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
-                    scratchBuffer.SetData(new Scratch[1] { new Scratch() { volumeCount = 1, index = 0, swizzle = new uint3(0, 1, 2) } });
+                using (var volumeBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
+                    volumeBuffer.SetData(volumes);
+                    using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                        scratchBuffer.SetData(new Scratch() { volumeCount = 1, index = 0, swizzle = new uint3(0, 1, 2), normalizer = norm });
 
-                    medianCut.CountVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, indirectBuffer, false);
+                        medianCut.CountVolume(command, volumeBuffer, scratchBuffer, histogramBuffer, indirectBuffer, populationProductVolume);
 
-                    Graphics.ExecuteCommandBuffer(command);
+                        Graphics.ExecuteCommandBuffer(command);
 
-                    volumeBuffer.GetData(volumes);
-
-                    {
+                        Scratch[] scratch = new Scratch[scratchBuffer.count];
+                        scratchBuffer.GetData(scratch);
                         ColorVolume[] actual = new ColorVolume[volumeBuffer.count];
                         volumeBuffer.GetData(actual);
 
-                        // todo use cpu reference
-                        Assert.AreEqual(image.width * image.height, volumes[0].count);
-                        Assert.AreEqual(volumes[0].count, volumes[0].priority); // todo * volume version
-                        Assert.AreEqual(image.width * image.height, volumes[1].count);
-                        Assert.AreEqual(volumes[1].count, volumes[1].priority); // todo * volume version
-                    }
-                    {
-                        Scratch[] actual = new Scratch[scratchBuffer.count];
-                        scratchBuffer.GetData(actual);
-                        Assert.AreEqual(2, actual[0].volumeCount);
-                        Assert.AreEqual(0, actual[0].index);
+                        handle.Complete();
+                        // todo impl to cpu
+                        uint expectedCount = 1;
+                        if (expected2[0].count == 0) {
+                        } else if (expected1[0].count == 0) {
+                            expected1[0] = expected2[0]; // 後者は有効なので上書きして反映
+                        } else {
+                            expectedCount = 2;
+                        }
+                        Assert.AreEqual(expectedCount, scratch[0].volumeCount);
+                        Assert.AreEqual(0, scratch[0].index);
+                        Assert.AreEqual(expected1[0].count, actual[0].count);
+                        Assert.AreEqual(expected1[0].Volume > 1 ? expected1[0].UpdatePriority(populationProductVolume).priority * norm : 0.0f, actual[0].priority);
+                        if (expectedCount == 2) {
+                            Assert.AreEqual(expected2[0].count, actual[1].count);
+                            Assert.AreEqual(expected2[0].Volume > 1 ? expected2[0].UpdatePriority(populationProductVolume).priority * norm : 0.0f, actual[1].priority);
+                        }
 
                     }
-
                 }
-
             }
         }
 
