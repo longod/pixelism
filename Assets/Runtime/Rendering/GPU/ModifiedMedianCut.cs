@@ -117,7 +117,6 @@ namespace Pixelism {
             var pass = _UpdatePriority;
             using (pass.SamplingScope(command)) {
                 SetKeywords(command, populationProductVolume: populationProductVolume);
-                command.SetKeyword(pass.shader, priorityKeyword, populationProductVolume);
                 command.SetComputeBufferParam(pass.shader, pass.kernel, "_Scratch", scratch);
                 command.SetComputeBufferParam(pass.shader, pass.kernel, "_Volumes", volumes);
                 //int threadGroupsX = Math.DivRoundUp(volumes.count, (int)pass.threadGroupSizes.x);

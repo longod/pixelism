@@ -84,10 +84,6 @@ RWStructuredBuffer<DispatchArguments> _Args;
 #pragma kernel SetupVolume
 [numthreads(1, 1, 1)]
 void SetupVolume(uint id : SV_DispatchThreadID) {
-    // full space
-    // todo fit min max
-    // todo countも欲しい。殆ど場合無くても成立するが
-    //_Volumes[0] = CreateVolume(uint3(0, 0, 0), uint3(ChannelMax, ChannelMax, ChannelMax), _PixelCount);
     // keyword増やしたくないので常にバッファを使う
     _Volumes[0] = CreateVolume(_MinMax[0], _MinMax[1], _PixelCount);
 
@@ -104,7 +100,7 @@ void SetupVolume(uint id : SV_DispatchThreadID) {
 [numthreads(1, 1, 1)]
 void FindCuttingVolume(uint id : SV_DispatchThreadID) {
     const uint count = _Scratch[0].volumeCount;
-    if(count >= _VolumeCount) {
+    if(count >= _VolumeCount || count == 0) {
         _Args[0] = (DispatchArguments)0;
         return;
     }
@@ -120,11 +116,7 @@ void FindCuttingVolume(uint id : SV_DispatchThreadID) {
     }
 
     // float だと初期値負数の方がいいかも
-    if(prio == 0) {
-        index = -1; // invalid
-    }
-    if(index < 0) {
-        // mark as end
+    if(prio == 0.0f) {
         _Args[0] = (DispatchArguments)0;
         return;
     }
@@ -322,7 +314,6 @@ groupshared uint gsMax;
 //[numthreads(256, 1, 1)]
 [numthreads(16, 1, 1)]
 void UpdatePriority(uint id : SV_DispatchThreadID) {
-    // todo 一応 priorityを選べるとよい
     if(id == 0){
         gsMax = 0;
     }
@@ -334,16 +325,21 @@ void UpdatePriority(uint id : SV_DispatchThreadID) {
         InterlockedMax(gsMax, v);
     }
     GroupMemoryBarrierWithGroupSync();
-    float norm = 1.0f;
-    if(gsMax> 0) { // 3項演算子だと、最適化でfalseでも実行される可能性がある
+    float norm = 1.0f; // オーバーフローしないようにvolumeを正規化する
+    if(gsMax > 0) { // 3項演算子だと、最適化でfalseでも実行される可能性がある
         norm = 1.0f / (float)gsMax;
     }
     if(id < scratch.volumeCount) {
         ColorVolume vol = _Volumes[id];
         uint v = ComputeVolume(vol); // todo cache
+#if PRODUCT_VOLUME
         _Volumes[id].priority = vol.count * (v * norm);
+#else
+        // 一応normalizerは求めておく
+        _Volumes[id].priority = vol.count;
+#endif
     }
-    if(id == 0){
+    if(id == 0) {
         _Scratch[0].normalizer = norm;
     }
 }

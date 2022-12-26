@@ -8,6 +8,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Random = Unity.Mathematics.Random;
 
 namespace Pixelism.Test {
 
@@ -139,12 +140,12 @@ namespace Pixelism.Test {
             }
 
             var volumes = priorities.Select(x => new ColorVolume() { priority = x, min = min, max = max, count = (uint)x }).ToArray();
-            Scratch scratch = new Scratch() { index = -1, volumeCount = (uint)volumeCount };
+            Assert.AreEqual(16, volumes.Length);
 
             using (var volumesBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
                 volumesBuffer.SetData(volumes);
                 using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
-                    scratchBuffer.SetData(scratch);
+                    scratchBuffer.SetData(new Scratch() { index = -1, volumeCount = (uint)volumeCount });
 
                     medianCut.FindCuttingVolume(command, volumesBuffer, scratchBuffer, indirectBuffer, volumesBuffer.count);
                     Graphics.ExecuteCommandBuffer(command);
@@ -318,8 +319,39 @@ namespace Pixelism.Test {
         }
 
         [Test]
-        public void UpdatePriority() {
-            Assert.Fail(); // yet
+        public void UpdatePriority([Values(false, true)] bool populationProductVolume, [Values(false, true)] bool zeroRange, [Values(false, true)] bool zeroCount) {
+            // TODO range 0からフルレンジ、までほどほどに分布したり、全て0になるようなデータが良い
+            // zeroRange: Trueのとき、全部が0だとあまり良くない気も
+            Random rand = new Random(0x1234);
+            var volumes = Enumerable.Range(1, 16).Select(x => {
+                var mid = rand.NextUInt3(0, 0xf);
+                var min = rand.NextUInt3(zeroRange ? mid : 0, mid);
+                var max = rand.NextUInt3(mid, zeroRange ? mid : 0xf);
+                var count = zeroCount ? 0u : rand.NextUInt(0x1, 0xf);
+                return new ColorVolume() { min = min, max = max, count = count, priority = -1.0f };
+            }).ToArray();
+            Assert.AreEqual(16, volumes.Length); // 16 要素固定
+
+            var expected = volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max, x.count, populationProductVolume)).ToArray();
+
+            using (var volumeBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
+                volumeBuffer.SetData(volumes);
+                using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                    scratchBuffer.SetData(new Scratch() { volumeCount = (uint)volumes.Length, index = 0, swizzle = new uint3(0, 1, 2), normalizer = 1.0f });
+
+                    medianCut.UpdatePriority(command, volumeBuffer, scratchBuffer, populationProductVolume);
+
+                    Graphics.ExecuteCommandBuffer(command);
+
+                    Scratch[] scratch = new Scratch[scratchBuffer.count];
+                    scratchBuffer.GetData(scratch);
+                    ColorVolume[] actual = new ColorVolume[volumeBuffer.count];
+                    volumeBuffer.GetData(actual);
+                    Assert.AreEqual(1.0f / expected.Max(x => x.Volume), scratch[0].normalizer);
+                    AssertHelper.AreEqual(expected.Select(x => populationProductVolume ? (x.priority * scratch[0].normalizer) : x.priority).ToArray(), actual.Select(x => x.priority).ToArray(), 1e-6f);
+
+                }
+            }
         }
 
         [TestCaseSource(nameof(TestImage))]

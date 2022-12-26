@@ -26,6 +26,20 @@ namespace Pixelism.Test {
             }
         }
 
+        public static void AreEqual(ReadOnlySpan<float> expected, ReadOnlySpan<float> actual, float delta) {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, float, float)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!Math.Approximately(actual[i], expected[i], delta)) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2:r}\r\n    But was:  {i.Item3:r}"));
+                Assert.Fail(message);
+            }
+        }
+
         public static void AreEqual<T>(ReadOnlySpan<T> expected, ReadOnlySpan<T> actual) where T : IEquatable<T> {
             Assert.AreEqual(expected.Length, actual.Length);
             var notEqual = new List<(int, T, T)>(actual.Length);
