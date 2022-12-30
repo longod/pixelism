@@ -13,6 +13,11 @@ namespace Pixelism.Test {
     // 未対応の型への対応
     // runtime test, editor testでの共有をどうするか。テスト用専用別アセンブリ？
     public static class AssertHelper {
+        public static void AreEqual(float expected, float actual, float delta) {
+            if (!Math.Approximately(expected, actual, delta)) {
+                Assert.Fail($"Expected: {expected}\r\n  But was:  {actual}");
+            }
+        }
 
         public static void AreEqual(float3 expected, float3 actual) {
             if (!expected.Equals(actual)) {
@@ -23,6 +28,20 @@ namespace Pixelism.Test {
         public static void AreEqual(float3 expected, float3 actual, float delta) {
             if (!math.all(Math.Approximately(expected, actual, delta))) {
                 Assert.Fail($"Expected: {expected}\r\n  But was:  {actual}");
+            }
+        }
+
+        public static void AreEqual(NativeSlice<float3> expected, ReadOnlySpan<float3> actual, float delta) {
+            Assert.AreEqual(expected.Length, actual.Length);
+            var notEqual = new List<(int, float3, float3)>(actual.Length);
+            for (int i = 0; i < actual.Length; ++i) {
+                if (!math.all(Math.Approximately(expected[i], actual[i], delta))) {
+                    notEqual.Add((i, expected[i], actual[i]));
+                }
+            }
+            if (notEqual.Count > 0) {
+                var message = string.Join("\r\n", notEqual.Select(i => $"{i.Item1}:\r\n  Expected: {i.Item2}\r\n    But was:  {i.Item3}"));
+                Assert.Fail(message);
             }
         }
 

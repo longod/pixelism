@@ -134,9 +134,9 @@ namespace Pixelism {
                     paletteCount = Cut<T>(volumes, histogram, paletteCount, NumColor, true, bit, converters);
 
                     // generate color palette
-                    using (NativeArray<float3> average = new NativeArray<float3>(paletteCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
+                    using (NativeArray<float3> palette = new NativeArray<float3>(paletteCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
 
-                        new ComputeColorJob<T>(average, volumes, histogram, converter).Schedule().Complete();
+                        new ComputeColorJob<T>(palette, volumes, histogram, converter).Schedule().Complete();
                         if (colorPalette == null || colorPalette.count != paletteCount) {
                             colorPalette?.Dispose();
                             colorPalette = new ComputeBuffer((int)paletteCount, Marshal.SizeOf<float3>());
@@ -144,10 +144,10 @@ namespace Pixelism {
                         // send to compute buffer
                         if (command != null) {
                             // TODO average bufferを恒常的にしたほうがよい。4フレーム寿命があるので、その間にcommandが実行されると成立するが…
-                            command.SetBufferData(colorPalette, average);
+                            command.SetBufferData(colorPalette, palette);
                             command.SetBufferData(colorPaletteCount, new int[1] { paletteCount });
                         } else {
-                            colorPalette.SetData(average);
+                            colorPalette.SetData(palette);
                             colorPaletteCount.SetData(new int[1] { paletteCount });
                         }
 

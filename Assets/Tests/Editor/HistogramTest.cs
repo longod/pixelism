@@ -8,7 +8,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static Pixelism.ModifiedMedianCutCPU;
 
 namespace Pixelism.Test {
 

@@ -105,6 +105,8 @@ void FindCuttingVolume(uint id : SV_DispatchThreadID) {
         return;
     }
 
+    // .count 1 以下も対象にしない方がよいが、全体の処理順的には起こりえない。例外ケースはある？
+
     int index = 0;
     float prio = _Volumes[0].priority;
     for (uint i = 1; i < count; ++i) {

@@ -323,7 +323,7 @@ namespace Pixelism.Test {
             // TODO range 0からフルレンジ、までほどほどに分布したり、全て0になるようなデータが良い
             // zeroRange: Trueのとき、全部が0だとあまり良くない気も
             Random rand = new Random(0x1234);
-            var volumes = Enumerable.Range(1, 16).Select(x => {
+            var volumes = Enumerable.Range(0, 16).Select(x => {
                 var mid = rand.NextUInt3(0, 0xf);
                 var min = rand.NextUInt3(zeroRange ? mid : 0, mid);
                 var max = rand.NextUInt3(mid, zeroRange ? mid : 0xf);
@@ -347,16 +347,66 @@ namespace Pixelism.Test {
                     scratchBuffer.GetData(scratch);
                     ColorVolume[] actual = new ColorVolume[volumeBuffer.count];
                     volumeBuffer.GetData(actual);
-                    Assert.AreEqual(1.0f / expected.Max(x => x.Volume), scratch[0].normalizer);
+                    AssertHelper.AreEqual(1.0f / expected.Max(x => x.Volume), scratch[0].normalizer, 1e-6f);
                     AssertHelper.AreEqual(expected.Select(x => populationProductVolume ? (x.priority * scratch[0].normalizer) : x.priority).ToArray(), actual.Select(x => x.priority).ToArray(), 1e-6f);
 
                 }
             }
         }
 
-        [TestCaseSource(nameof(TestImage))]
-        public void ComputeColor(string key) {
-            Assert.Fail(); // yet
+        [Test]
+        public void ComputeColor([ValueSource(nameof(TestImage))] string key, [Values(1, 15, 16)] int num) {
+            bool color12Bit = false; // TODO cpuと比較する場合、converterを切り替える必要がある
+            var histogram = cachedHistogram[key].Histogram;
+            histogramBuffer.SetData(histogram);
+
+            // 大分分布が怪しいが適当に区切る, 改善の余地あり
+            var volumes = Enumerable.Range(0, 16).Select(x => new ColorVolume() { min = new uint3((uint)x), max = new uint3((uint)x), count = 0, priority = -1.0f }).ToArray();
+            using (var vol = new NativeArray<ModifiedMedianCutCPU.ColorVolumeCPU>(volumes.Select(x => new ModifiedMedianCutCPU.ColorVolumeCPU(x.min, x.max)).ToArray(), Allocator.TempJob)) {
+                using (var handles = new NativeArray<JobHandle>(vol.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
+
+                    var converter = converters[0];
+                    // compte count
+                    var hs = handles;
+                    for (int i = 0; i < vol.Length; ++i) {
+                        var count = new ModifiedMedianCutCPU.CountVolumeJob<ModifiedMedianCutCPU.DefaultConverter>(histogram, vol.Slice(i, 1), converter).Schedule();
+                        hs[i] = count;
+                    }
+                    var handle = JobHandle.CombineDependencies(handles);
+                    handle.Complete();
+                    // copy
+                    for (int i = 0; i < volumes.Length; ++i) {
+                        volumes[i].count = vol[i].count;
+                        // Debug.Log(volumes[i].count);
+                    }
+
+                    using (NativeArray<float3> expected = new NativeArray<float3>(vol.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory)) {
+
+                        var h = new ModifiedMedianCutCPU.ComputeColorJob<ModifiedMedianCutCPU.DefaultConverter>(expected, vol, histogram, converter).Schedule();
+                        JobHandle.ScheduleBatchedJobs();
+                        using (var volumeBuffer = new ComputeBuffer(volumes.Length, Marshal.SizeOf<ColorVolume>())) {
+                            volumeBuffer.SetData(volumes);
+                            using (var scratchBuffer = ModifiedMedianCut.CreateScratchBuffer()) {
+                                scratchBuffer.SetData(new Scratch() { volumeCount = (uint)num, index = 0, swizzle = new uint3(0, 1, 2), normalizer = 1.0f });
+                                using (var colorPalette = new ComputeBuffer(volumes.Length, Marshal.SizeOf<float3>())) {
+
+                                    medianCut.ComputeColor(command, volumeBuffer, scratchBuffer, histogramBuffer, colorPalette, color12Bit);
+                                    Graphics.ExecuteCommandBuffer(command);
+
+                                    float3[] actual = new float3[colorPalette.count];
+                                    colorPalette.GetData(actual);
+
+                                    h.Complete();
+                                    AssertHelper.AreEqual(expected.Slice(0, num), actual.AsSpan(0, num), 1e-6f);
+                                }
+                            }
+                        }
+                    }
+
+
+                }
+            }
+
         }
 
     }
