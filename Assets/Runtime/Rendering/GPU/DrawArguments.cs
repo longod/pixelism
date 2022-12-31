@@ -29,7 +29,7 @@ namespace Pixelism {
         }
 
         public static ComputeBuffer Create(int count) {
-            return new ComputeBuffer(count, SizeOf(), ComputeBufferType.IndirectArguments);
+            return new ComputeBuffer(count, SizeOf(), ComputeBufferType.Raw | ComputeBufferType.IndirectArguments);
         }
     }
 
@@ -56,7 +56,7 @@ namespace Pixelism {
         }
 
         public static ComputeBuffer Create(int count) {
-            return new ComputeBuffer(count, SizeOf(), ComputeBufferType.IndirectArguments);
+            return new ComputeBuffer(count, SizeOf(), ComputeBufferType.Raw | ComputeBufferType.IndirectArguments);
         }
     }
 
@@ -71,15 +71,22 @@ namespace Pixelism {
         public uint threadGroupCountX;
         public uint threadGroupCountY;
         public uint threadGroupCountZ;
-        private uint padding;
+        private uint padding; // ByteAddressなら不要だが、structuredでも扱いやすいように
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int SizeOf() {
             return Marshal.SizeOf<DispatchArguments>();
         }
 
+        // 少なくとも、 Intel HD Graphics 620 では、 ComputeBufferType.IndirectArguments を指定すると、Structured で正常に値を書き込めない不具合がある（GPU or driver?）
+        // 強制的にByteAddressになるような挙動に見える。ByteAddressだと書けるようだ。
+        // IndirectArguments未指定だとstrucuredでも書けるようになるし、indirectとしても実行できるようになるが、GPUによってはそうでないケースがあるかもしれない。
+        // ここでRaw (ByteAddress)指定、GPUでStructuredでも機能するが、整合上はよろしくない。
+        // ここでvenderidからフラグを切り替えてもよいが、共通した挙動にするためGPU上ではByteAddressで扱う。
+        // そもそも IndirectArguments はなに？native apiに相当するものがない。
+        // これ以外のsturucured, constantはアライメント指定、raw, append, counterはflagsが存在する。PC以外のplatformで意味があることがあるのか？
         public static ComputeBuffer Create(int count) {
-            return new ComputeBuffer(count, SizeOf(), ComputeBufferType.IndirectArguments);
+            return new ComputeBuffer(count, SizeOf(), ComputeBufferType.Raw | ComputeBufferType.IndirectArguments);
         }
 
         public static ComputeBuffer Create(ComputeBuffer buffer, int count) {

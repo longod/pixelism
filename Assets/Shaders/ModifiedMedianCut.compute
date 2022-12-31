@@ -79,7 +79,7 @@ RWStructuredBuffer<uint> _Histogram;
 RWStructuredBuffer<uint3> _MinMax;
 RWStructuredBuffer<uint> _SumPerAxis; // histogram per axis11
 RWStructuredBuffer<float3> _Colors;
-RWStructuredBuffer<DispatchArguments> _Args;
+RWByteAddressBuffer _Args; // DispatchArguments
 
 #pragma kernel SetupVolume
 [numthreads(1, 1, 1)]
@@ -101,7 +101,7 @@ void SetupVolume(uint id : SV_DispatchThreadID) {
 void FindCuttingVolume(uint id : SV_DispatchThreadID) {
     const uint count = _Scratch[0].volumeCount;
     if(count >= _VolumeCount || count == 0) {
-        _Args[0] = (DispatchArguments)0;
+        _Args.Store3(0, uint3(0, 0, 0));
         return;
     }
 
@@ -119,7 +119,7 @@ void FindCuttingVolume(uint id : SV_DispatchThreadID) {
 
     // float だと初期値負数の方がいいかも
     if(prio == 0.0f) {
-        _Args[0] = (DispatchArguments)0;
+        _Args.Store3(0, uint3(0, 0, 0));
         return;
     }
 
@@ -127,9 +127,7 @@ void FindCuttingVolume(uint id : SV_DispatchThreadID) {
     uint axis = ComputeAxis(_Volumes[index]);
     _Scratch[0].swizzle = uint3(axis, (axis + 1) % 3, (axis + 2) % 3);
 
-    DispatchArguments args = (DispatchArguments)0;
-    args.threadGroupCount.xyz = 1;
-    _Args[0] = args;
+    _Args.Store3(0, uint3(1, 1, 1));
 }
 
 groupshared uint gsSumPerAxis[ChannelSize];
