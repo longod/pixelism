@@ -12,7 +12,7 @@ The motivation for this project is by real-time image processing to reach the vi
 Figure 1. PC-9801 style image: 4-bit indexed color from 12-bit color and CRT emulation post processing
 
 ## Usage
-- Install Unity 2022.1.23f1
+- Install Unity 2022.2.1f1
 - Open this project on Unity
 - Create new scene or open existing scene
 - Add `DisplayController` component to Main Camera

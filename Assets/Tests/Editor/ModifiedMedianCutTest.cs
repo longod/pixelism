@@ -397,7 +397,7 @@ namespace Pixelism.Test {
                                     colorPalette.GetData(actual);
 
                                     h.Complete();
-                                    AssertHelper.AreEqual(expected.Slice(0, num), actual.AsSpan(0, num), 1e-6f);
+                                    AssertHelper.AreEqual(expected.AsReadOnlySpan().Slice(0, num), actual.AsSpan(0, num), 1e-6f);
                                 }
                             }
                         }
